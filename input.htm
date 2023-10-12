@@ -59,8 +59,11 @@
 		<input type="file" id="icon" name="icon" accept=".icn, .ico" />
 		<br>
 		<hr>
-		<label for="psuinput">.psu goes here:</label>
+		<label for="psuinput">EMS Memory Adapter export file (.psu) goes here:</label>
 		<input type="file" id="psuinput" name="psuinput" accept=".psu" />
+		<br>
+		<label for="psvinput">PS3 export file (.psv) goes here:</label>
+		<input type="file" id="psvinput" name="psvinput" accept=".psv" />
 		<br>
 		<p>
 			<span>Date created: </span><span id="dateCreated">--:--:-- --/--/----</span><span> UTC+09:00</span>
@@ -99,6 +102,15 @@
 					glContext.drawArrays(glContext.TRIANGLE_STRIP, 0, 4);
 				}
 			}
+			function resetDisplay() {
+				document.getElementById("title1").textContent = "\uff0d";
+				document.getElementById("title2").textContent = "\uff0d";
+				document.getElementById("iconn").textContent = "?";
+				document.getElementById("iconc").textContent = "?";
+				document.getElementById("icond").textContent = "?";
+				document.getElementById("dateCreated").textContent = "--:--:-- --/--/----";
+				document.getElementById("dateModified").textContent = "--:--:-- --/--/----";
+			}
 			document.getElementById("strictnessOption").onchange = function(e) {
 				setStrictness(e.target.checked);
 				if(!!filebox.files.length) {filebox.onchange();}
@@ -107,11 +119,7 @@
 			}
 			filebox = document.getElementById("input");
 			filebox.onchange = function(e) {
-				document.getElementById("title1").textContent = "\uff0d";
-				document.getElementById("title2").textContent = "\uff0d";
-				document.getElementById("iconn").textContent = "?";
-				document.getElementById("iconc").textContent = "?";
-				document.getElementById("icond").textContent = "?";
+				resetDisplay();
 				if(filebox.files.length === 0) {
 					return;
 				}
@@ -142,13 +150,7 @@
 			}
 			psubox = document.getElementById("psuinput");
 			psubox.onchange = function(e) {
-				document.getElementById("title1").textContent = "\uff0d";
-				document.getElementById("title2").textContent = "\uff0d";
-				document.getElementById("iconn").textContent = "?";
-				document.getElementById("iconc").textContent = "?";
-				document.getElementById("icond").textContent = "?";
-				document.getElementById("dateCreated").textContent = "--:--:-- --/--/----";
-				document.getElementById("dateModified").textContent = "--:--:-- --/--/----";
+				resetDisplay();
 				if(psubox.files.length === 0) {
 					return;
 				}
@@ -167,6 +169,23 @@
 						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
 						console.log("model files", output2);
+					} catch(e) {
+						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
+						alert(e);
+					}
+				});
+			}
+			psvbox = document.getElementById("psvinput");
+			psvbox.onchange = function(e) {
+				resetDisplay();
+				if(psvbox.files.length === 0) {
+					return;
+				}
+				psvbox.files[0].arrayBuffer().then(function(d){
+					try {
+						let inputData = readPsvFile(d);
+						let output = readPS2D(inputData["icon.sys"]);
+						updateDisplay(output);
 					} catch(e) {
 						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
 						alert(e);
@@ -234,6 +253,7 @@
 			}
 			//todo: Model rendering, animation parsing, animation tweening
 		</script>
-		<span id="version">icondumper2 0.3.2 - &copy; 2023 yellows111</span>
+		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> - &copy; 2023 yellows111</span>
+		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>
 	</body>
 </html>

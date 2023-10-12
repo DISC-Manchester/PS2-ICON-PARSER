@@ -1,6 +1,7 @@
 //todo: Make this a module/mjs file. C6 compatibility can stay, if needed.
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
+ICONJS_VERSION = "0.3.3";
 
 function setDebug(value) {
 	ICONJS_DEBUG = !!value;
@@ -267,6 +268,52 @@ function readEmsPsuFile(input){
 	}
 	fsOut[header.filename] = output;
 	return fsOut;
+}
+
+function readPsvFile(input){
+	const view = new DataView(input);
+	const u32le = function(i){return view.getUint32(i, 1)};
+	//!pattern psv_file.hexpat
+	const magic = u32le(0);
+	if (magic !== 0x50535600) {
+		throw `Not a PS3 export (PSV) file (was ${magic}, expected ${0x50535600})`;
+	}
+	//:skip 4
+	//:skip 20 // key seed, console ignores this 
+	//:skip 20 // sha1 hmac digest, useful for... something
+	//:skip 8
+	const type1 = u32le(52);
+	const type2 = u32le(56);
+	if(type1 !== 0x2c && type2 !== 2) {
+		throw `Not parsing, this is not a PS2 save export (was ${type1}:${type2}, expected 44:2)`;
+	}
+	const displayedSize = u32le(60);
+	const ps2dOffset = u32le(64);
+	const ps2dSize = u32le(68); // don't know why this is included if its always 964
+	const nModelOffset = u32le(72);
+	const nModelSize = u32le(76);
+	const cModelOffset = u32le(80);
+	const cModelSize = u32le(84);
+	const dModelOffset = u32le(88);
+	const dModelSize = u32le(92);
+	const numberOfFiles = u32le(96); // in-case this library changes stance on other files
+	const rootDirectoryData = input.slice(100, 158);
+	let offset = 158;
+	let fileData = new Array();
+	for (let index = 0; index < numberOfFiles; index++) {
+		fileData.push(input.slice(offset,offset+0x3c));
+		offset += 0x3c;
+	};
+	//then file data after this but we already have pointers to the files we care about
+	const icons = {
+		n: input.slice(nModelOffset, nModelOffset+nModelSize),
+		c: input.slice(cModelOffset, cModelOffset+cModelSize),
+		d: input.slice(dModelOffset, dModelOffset+dModelSize),
+	}
+	if (ICONJS_DEBUG) {
+		console.log({magic, type1, type2, displayedSize, ps2dOffset, ps2dSize, nModelOffset, nModelSize, cModelOffset, cModelSize, dModelOffset, dModelSize, numberOfFiles, rootDirectoryData, fileData})
+	}
+	return {icons, "icon.sys": input.slice(ps2dOffset, ps2dOffset+ps2dSize)};
 }
 
 if(typeof module !== "undefined") {
