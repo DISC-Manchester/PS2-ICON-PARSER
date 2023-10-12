@@ -186,6 +186,11 @@
 						let inputData = readPsvFile(d);
 						let output = readPS2D(inputData["icon.sys"]);
 						updateDisplay(output);
+						let cTime = inputData.timestamps.created;
+						let mTime = inputData.timestamps.modified;
+						//TODO: use Time() to align JST times to user-local timezone
+						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
+						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
 					} catch(e) {
 						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
 						alert(e);

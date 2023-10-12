@@ -1,7 +1,7 @@
 //todo: Make this a module/mjs file. C6 compatibility can stay, if needed.
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
-ICONJS_VERSION = "0.3.3";
+ICONJS_VERSION = "0.3.4";
 
 function setDebug(value) {
 	ICONJS_DEBUG = !!value;
@@ -114,11 +114,16 @@ function readIconFile(input) {
 		throw `Not a PS2 icon file (was ${magic}, expected ${0x010000})`;
 	}
 	const numberOfShapes = u32le(4);
+	if(numberOfShapes > 16) {
+		throw `Too many defined shapes! Is this a valid file? (file reports ${numberOfShapes} shapes)`;
+	}
 	const textureType = u32le(8);
 	const textureFormat = getTextureFormat(textureType);
 	//:skip 4
 	const numberOfVertexes = u32le(16);
-	// now we're entering a bunch of chunks... oh baby, now it's painful.
+	if(!!(numberOfVertexes % 3)){
+		throw `Not enough vertices to define a triangle (${numberOfVertexes % 3} vertices remained).`;
+	}
 	// format: [xxyyzzaa * numberOfShapes][xxyyzzaa][uuvvrgba], ((8 * numberOfShapes) + 16) [per chunk]
 	let offset = 20;
 	let vertices = new Array();
@@ -148,13 +153,12 @@ function readIconFile(input) {
 		};
 		let color = u32_rgba8(u32le(offset+(chunkLength*index)+((numberOfShapes * 8))+12));
 		// keep original u32le color?
-		
 		vertices.push({shapes, normal, uv, color});
 	}
 	offset = (20+(numberOfVertexes * chunkLength));
 	animationHeader = {id: u32le(offset), length: u32le(offset+4), speed: f32le(offset+8), "offset": u32le(offset+12), keyframes: u32le(offset+16)};
 	let animData = new Array();
-	// now we have to do stuff dynamically
+	// now we have to enumerate values, so now we introduce an offset value.
 	// format for a keyframe: sssskkkk[ffffvvvv] where [ffffvvvv] repeat based on the value that kkkk(eys) has.
 	// sssskkkk[ffffvvvv] is repeated based on animationHeader.keyframes value.
 	offset += 20;
@@ -177,11 +181,26 @@ function readIconFile(input) {
 		case 'U': {
 			//where every 16-bit entry is a BGR5A1 color 0b[bbbbbgggggrrrrra]
 			texture = new Uint16Array(input.slice(offset, (offset+0x8000)));
-			//texture.forEach(function(indice){console.log(BGR5A1(indice))});
 			break;
 		}
 		case 'C': {
-			// compression format unknown, but all in type use same header format
+			// compression format is RLE-based, where first u32 is size, and format is defined as:
+			/**
+			* u16 rleType;
+			* if (rleType >= 0xff00) {
+			*	//do a raw copy
+			*	let length = (0xffff - rleType);
+			*	byte data[length];
+			* } else {
+			*	//repeat next byte rleType times
+			*	data = new Uint16Array(rleType);
+			*	for (let index = 0; index < rleType; index++) {
+			*		data[index] = u16 repeater @ +4;
+			*	}
+			* }
+			**/
+			//output of this will be another u16[0x4000] of the decompressed texture
+			//after that just parse output as-if it was uncompressed, I think.
 			size = u32le(offset);
 			texture = {size, data: input.slice(offset+4, offset+(4+size))};
 		}
@@ -273,6 +292,14 @@ function readEmsPsuFile(input){
 function readPsvFile(input){
 	const view = new DataView(input);
 	const u32le = function(i){return view.getUint32(i, 1)};
+	const t64le = function(i){return {
+		seconds: view.getUint8(i+1),
+		minutes: view.getUint8(i+2),
+		hours: view.getUint8(i+3),
+		day: view.getUint8(i+4),
+		month: view.getUint8(i+5),
+		year: view.getUint16(i+6, 1)
+	}};
 	//!pattern psv_file.hexpat
 	const magic = u32le(0);
 	if (magic !== 0x50535600) {
@@ -280,25 +307,28 @@ function readPsvFile(input){
 	}
 	//:skip 4
 	//:skip 20 // key seed, console ignores this 
-	//:skip 20 // sha1 hmac digest, useful for... something
+	//:skip 20 // sha1 hmac digest, useful for verifying that this is, indeed, save data.
 	//:skip 8
-	const type1 = u32le(52);
-	const type2 = u32le(56);
+	const type1 = u32le(56);
+	const type2 = u32le(60);
 	if(type1 !== 0x2c && type2 !== 2) {
 		throw `Not parsing, this is not a PS2 save export (was ${type1}:${type2}, expected 44:2)`;
 	}
-	const displayedSize = u32le(60);
-	const ps2dOffset = u32le(64);
-	const ps2dSize = u32le(68); // don't know why this is included if its always 964
-	const nModelOffset = u32le(72);
-	const nModelSize = u32le(76);
-	const cModelOffset = u32le(80);
-	const cModelSize = u32le(84);
-	const dModelOffset = u32le(88);
-	const dModelSize = u32le(92);
-	const numberOfFiles = u32le(96); // in-case this library changes stance on other files
-	const rootDirectoryData = input.slice(100, 158);
-	let offset = 158;
+	const displayedSize = u32le(64);
+	const ps2dOffset = u32le(68);
+	const ps2dSize = u32le(72); // don't know why this is included if its always 964
+	const nModelOffset = u32le(76);
+	const nModelSize = u32le(80);
+	const cModelOffset = u32le(84);
+	const cModelSize = u32le(88);
+	const dModelOffset = u32le(92);
+	const dModelSize = u32le(96);
+	const numberOfFiles = u32le(100); // in-case this library changes stance on other files
+	// file = {t64le created, t64le modified, u32 size, u32 permissions, byte[32] title}
+	// and if it's not the root directory, add another u32 for offset/location
+	const rootDirectoryData = input.slice(104, 162);
+	const timestamps = {created: t64le(104), modified: t64le(112)};
+	let offset = 162;
 	let fileData = new Array();
 	for (let index = 0; index < numberOfFiles; index++) {
 		fileData.push(input.slice(offset,offset+0x3c));
@@ -313,7 +343,7 @@ function readPsvFile(input){
 	if (ICONJS_DEBUG) {
 		console.log({magic, type1, type2, displayedSize, ps2dOffset, ps2dSize, nModelOffset, nModelSize, cModelOffset, cModelSize, dModelOffset, dModelSize, numberOfFiles, rootDirectoryData, fileData})
 	}
-	return {icons, "icon.sys": input.slice(ps2dOffset, ps2dOffset+ps2dSize)};
+	return {icons, "icon.sys": input.slice(ps2dOffset, ps2dOffset+ps2dSize), timestamps};
 }
 
 if(typeof module !== "undefined") {

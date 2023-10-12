@@ -16,15 +16,18 @@ if(processObj.argv[2] === "psu") {
 	let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.psu");
 	const parsed = iconjs.readEmsPsuFile(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
 	const PS2D = iconjs.readPS2D(parsed[parsed.rootDirectory]["icon.sys"].data);
-	output = {parsed, PS2D}
+	let output = {parsed, PS2D}
 	Object.keys(PS2D.filenames).forEach(function(file) {
 		output[file] = iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames[file]].data);
 	});
 	console.log(output);
 } else if(processObj.argv[2] === "psv") {
-	let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.psu");
+	let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.psv");
 	const parsed = iconjs.readPsvFile(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
 	console.log(parsed);
+	const PS2D = iconjs.readPS2D(parsed["icon.sys"]);
+	let output = {parsed, PS2D};
+	console.log(output);
 } else {
 	let inputFile = filesystem.readFileSync(processObj.argv[2] ? processObj.argv[2] : "icon.sys");
 	const metadata = iconjs.readPS2D(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
