@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8"></meta>
+		<meta name="viewport" content="initial-scale=2.0"></meta>
+		<meta name="description" content="A HTML client for icondumper2"></meta>
+		<title>input validation test</title>
+		<script src="icon.js"></script>
+		<style>
+			html {color: #ccc; background: black; font-family: sans-serif}
+			#title1, #title2 {
+				color: yellow;
+				text-align: right;
+				/*text-shadow: -2px 0 black, 0 2px black, 2px 0 black, 0 -2px black;*/
+				right: 8px;
+				position: relative;
+				margin: 0;
+			}
+			#version {position: fixed;bottom:4px;right:4px}
+		</style>
+		<script type="text/plain" id="verts1">
+			attribute vec4 a_position;
+			attribute vec4 a_color;
+			
+			varying lowp vec4 vColor;
+
+			void main() {
+				gl_Position = a_position;
+				vColor = a_color;
+			}
+		</script>
+		<script type="text/plain" id="frags1">
+			precision mediump float;
+			varying lowp vec4 vColor;
+
+			void main() {
+				gl_FragColor = vColor;
+			}
+		</script>
+	</head>
+	<body>
+		<label for="strictnessOption">enable strict mode</label>
+		<input id="strictnessOption" type="checkbox" checked></input>
+		<span>(enables console-accurate title parsing)</span>
+		<hr>
+		<label for="input">icon.sys goes here:</label>
+		<input type="file" id="input" name="input" accept=".sys" />
+		<br>
+		<h1 id="title1">&#xFF2E;&#xFF4F;&#x3000;&#xFF26;&#xFF49;&#xFF4C;&#xFF45;</h1> 
+		<h1 id="title2">&#xFF2C;&#xFF4F;&#xFF41;&#xFF44;&#xFF45;&#xFF44;</h1>
+		<span>Background preview:</span><br>
+		<canvas id="iconcanvas" width="240" height="240"></canvas>
+		<hr>
+		<p>Normal: <kbd id="iconn">(no file)</kbd></p>
+		<p>Copying: <kbd id="iconc">(no file)</kbd></p>
+		<p>Deleting: <kbd id="icond">(no file)</kbd></p>
+		<hr>
+		<label for="icon">.ic(n|o) goes here:</label>
+		<input type="file" id="icon" name="icon" accept=".icn, .ico" />
+		<br>
+		<hr>
+		<label for="psuinput">.psu goes here:</label>
+		<input type="file" id="psuinput" name="psuinput" accept=".psu" />
+		<br>
+		<p>
+			<span>Date created: </span><span id="dateCreated">--:--:-- --/--/----</span><span> UTC+09:00</span>
+			<br>
+			<span>Date modified: </span><span id="dateModified">--:--:-- --/--/----</span><span> UTC+09:00</span>
+		</p>
+		<!-- TODO MAKE NEW DISPLAY BOXES !-->
+		<script>
+			// i know this is sinful, but i don't want to load from an event again
+			function updateDisplay(input) {
+				document.getElementById("title1").textContent = input.title[0];
+				document.getElementById("title2").textContent = input.title[1];
+				document.getElementById("iconn").textContent = input.filenames.n;
+				document.getElementById("iconc").textContent = input.filenames.c;
+				document.getElementById("icond").textContent = input.filenames.d;
+				if(glContext !== null) {
+					colors = [
+						input.background.colors[0].r/255,
+						input.background.colors[0].g/255,
+						input.background.colors[0].b/255,
+						input.background.alpha*2,
+						input.background.colors[1].r/255,
+						input.background.colors[1].g/255,
+						input.background.colors[1].b/255,
+						input.background.alpha*2,
+						input.background.colors[2].r/255,
+						input.background.colors[2].g/255,
+						input.background.colors[2].b/255,
+						input.background.alpha*2,
+						input.background.colors[3].r/255,
+						input.background.colors[3].g/255,
+						input.background.colors[3].b/255,
+						input.background.alpha*2
+					];
+					glContext.bufferData(glContext.ARRAY_BUFFER, new Float32Array(colors), glContext.STATIC_DRAW);
+					glContext.drawArrays(glContext.TRIANGLE_STRIP, 0, 4);
+				}
+			}
+			document.getElementById("strictnessOption").onchange = function(e) {
+				setStrictness(e.target.checked);
+				if(!!filebox.files.length) {filebox.onchange();}
+				if(!!iconbox.files.length) {iconbox.onchange();}
+				if(!!psubox.files.length) {psubox.onchange();}
+			}
+			filebox = document.getElementById("input");
+			filebox.onchange = function(e) {
+				document.getElementById("title1").textContent = "\uff0d";
+				document.getElementById("title2").textContent = "\uff0d";
+				document.getElementById("iconn").textContent = "?";
+				document.getElementById("iconc").textContent = "?";
+				document.getElementById("icond").textContent = "?";
+				if(filebox.files.length === 0) {
+					return;
+				}
+				filebox.files[0].arrayBuffer().then(function(d){
+					try {
+						let output = readPS2D(d);
+						console.log("icon.sys", output);
+						updateDisplay(output);
+					} catch(e) {
+						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
+						alert(e);
+					}
+				});
+			}
+			iconbox = document.getElementById("icon");
+			iconbox.onchange = function(e) {
+				if(iconbox.files.length === 0) {
+					return;
+				}
+				iconbox.files[0].arrayBuffer().then(function(d){
+					try {
+						let output = readIconFile(d);
+						console.log("model data",output);
+					} catch(e) {
+						alert(e);
+					}
+				});
+			}
+			psubox = document.getElementById("psuinput");
+			psubox.onchange = function(e) {
+				document.getElementById("title1").textContent = "\uff0d";
+				document.getElementById("title2").textContent = "\uff0d";
+				document.getElementById("iconn").textContent = "?";
+				document.getElementById("iconc").textContent = "?";
+				document.getElementById("icond").textContent = "?";
+				document.getElementById("dateCreated").textContent = "--:--:-- --/--/----";
+				document.getElementById("dateModified").textContent = "--:--:-- --/--/----";
+				if(psubox.files.length === 0) {
+					return;
+				}
+				psubox.files[0].arrayBuffer().then(function(d){
+					try {
+						let vFilesystem = readEmsPsuFile(d);
+						let output = readPS2D(vFilesystem[vFilesystem.rootDirectory]["icon.sys"].data);
+						updateDisplay(output);
+						let output2 = new Object();
+						Object.keys(output.filenames).forEach(function(file) {
+							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
+						});
+						let cTime = vFilesystem.timestamps.created;
+						let mTime = vFilesystem.timestamps.modified;
+						//TODO: use Time() to align JST times to user-local timezone
+						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
+						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
+						console.log("model files", output2);
+					} catch(e) {
+						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
+						alert(e);
+					}
+				});
+			}
+			function createShader(gl, type, source) {
+				var shader = gl.createShader(type);
+				gl.shaderSource(shader, source);
+				gl.compileShader(shader);
+				var success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+				if (success) {
+					return shader;
+				}
+
+				console.log(gl.getShaderInfoLog(shader));
+				gl.deleteShader(shader);
+			}
+			function createProgram(gl, vertexShader, fragmentShader) {
+				var program = gl.createProgram();
+				gl.attachShader(program, vertexShader);
+				gl.attachShader(program, fragmentShader);
+				gl.linkProgram(program);
+				var success = gl.getProgramParameter(program, gl.LINK_STATUS);
+				if (success) {
+					return program;
+				}
+
+				console.log(gl.getProgramInfoLog(program));
+				gl.deleteProgram(program);
+			}
+			const canvas = document.getElementById("iconcanvas");
+			const glContext = canvas.getContext("webgl");
+			if(glContext !== null) {
+				//.section PROGRAM
+				var vertexShader = createShader(glContext, glContext.VERTEX_SHADER, document.getElementById("verts1").text);
+				var fragmentShader = createShader(glContext, glContext.FRAGMENT_SHADER, document.getElementById("frags1").text);
+				var program = createProgram(glContext, vertexShader, fragmentShader);
+				glContext.useProgram(program);
+				var attributes = {
+					position: glContext.getAttribLocation(program, "a_position"),
+					color: glContext.getAttribLocation(program, "a_color")
+				};
+				//.section POSITION
+				const positions = [-1,1, 1,1, -1,-1, 1,-1];
+				const positionBuffer = glContext.createBuffer();
+				glContext.bindBuffer(glContext.ARRAY_BUFFER, positionBuffer);
+				glContext.enableVertexAttribArray(attributes.position);
+				glContext.bufferData(glContext.ARRAY_BUFFER, new Float32Array(positions), glContext.STATIC_DRAW);
+				glContext.vertexAttribPointer(attributes.position, 2, glContext.FLOAT, false, 0, 0);
+				//.section COLOR
+				const colors = [1,0,0,1, 0,1,0,1, 0,0,1,1, 1,1,1,1];
+				const colorBuffer = glContext.createBuffer();
+				glContext.bindBuffer(glContext.ARRAY_BUFFER, colorBuffer);
+				glContext.enableVertexAttribArray(attributes.color);
+				glContext.bufferData(glContext.ARRAY_BUFFER, new Float32Array(colors), glContext.STATIC_DRAW);
+				glContext.vertexAttribPointer(attributes.color, 4, glContext.FLOAT, false, 0, 0);
+				//.section CLEAR
+				glContext.clearColor(0.1,0.1,0.4,1);
+				glContext.clear(glContext.COLOR_BUFFER_BIT);
+				//.section WRITE
+				glContext.drawArrays(glContext.TRIANGLE_STRIP, 0, 4);
+			} else {
+				canvas.style.display = "none";
+			}
+			//todo: Model rendering, animation parsing, animation tweening
+		</script>
+		<span id="version">icondumper2 0.3.2 - &copy; 2023 yellows111</span>
+	</body>
+</html>
