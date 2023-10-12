@@ -207,7 +207,7 @@ function readEntryBlock(input) {
 	const permissions = u32le(0);
 	let type;
 	if (permissions>0xffff) {
-		throw `Not a EMS Max (PSU) save file (was ${permissions}, expected less than ${0xffff})`;
+		throw `Not a EMS Memory Adapter (PSU) export file (was ${permissions}, expected less than ${0xffff})`;
 	}
 	if((permissions & 0b00100000)>=1){
 		type = "directory";
