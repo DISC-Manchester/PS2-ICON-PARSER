@@ -3,8 +3,11 @@ A JavaScript library (sorta) to read PS2 icons, and their related formats.
 
 ## What it supports
 * EMS Memory Adapter export files (.psu)
+* PS3 virtual memory card export files (.psv)
+* SharkPort export files (.sps)
+* X-Port export files (.xps)
 * PS2 icons (.ico, .icn)
-* PS2D format (icon.sys) 
+* PS2D format (icon.sys)
 
 ## What can it do
 * Allow any file in a PSU's virtual filesystem to be dumped.
@@ -22,4 +25,4 @@ A JavaScript library (sorta) to read PS2 icons, and their related formats.
 (todo: write this)
 
 ## Why "icondumper2"?
-Because it replaced what *was* left of icondumper.
+Because it replaced what *was* left of icondumper (1).

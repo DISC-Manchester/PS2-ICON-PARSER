@@ -1,4 +1,15 @@
+# Extracted files
+
 *.ico
 *.icn
 icon.sys
+# Save export files
+
 *.psu
+*.psv
+*.xps
+*.sps
+
+# Unused data
+
+tmp/*

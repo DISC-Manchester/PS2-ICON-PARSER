@@ -17,6 +17,7 @@
 				margin: 0;
 			}
 			#version {position: fixed;bottom:4px;right:4px}
+			#advanced {display: none}
 		</style>
 		<script type="text/plain" id="verts1">
 			attribute vec4 a_position;
@@ -41,10 +42,10 @@
 	<body>
 		<label for="strictnessOption">enable strict mode</label>
 		<input id="strictnessOption" type="checkbox" checked></input>
-		<span>(enables console-accurate title parsing)</span>
+		<span>(enables console-accurate title parsing) | </span>
+		<label for="showExtractedInputOption">show other import options</label>
+		<input id="showExtractedInputOption" type="checkbox"></input>
 		<hr>
-		<label for="input">icon.sys goes here:</label>
-		<input type="file" id="input" name="input" accept=".sys" />
 		<br>
 		<h1 id="title1">&#xFF2E;&#xFF4F;&#x3000;&#xFF26;&#xFF49;&#xFF4C;&#xFF45;</h1> 
 		<h1 id="title2">&#xFF2C;&#xFF4F;&#xFF41;&#xFF44;&#xFF45;&#xFF44;</h1>
@@ -54,10 +55,15 @@
 		<p>Normal: <kbd id="iconn">(no file)</kbd></p>
 		<p>Copying: <kbd id="iconc">(no file)</kbd></p>
 		<p>Deleting: <kbd id="icond">(no file)</kbd></p>
-		<hr>
-		<label for="icon">.ic(n|o) goes here:</label>
-		<input type="file" id="icon" name="icon" accept=".icn, .ico" />
-		<br>
+		<div id="advanced">
+			<hr>
+			<label for="input">icon.sys goes here:</label>
+			<input type="file" id="input" name="input" accept=".sys" />
+			<br>
+			<label for="icon">.ic(n|o) goes here:</label>
+			<input type="file" id="icon" name="icon" accept=".icn, .ico" />
+			<br>
+		</div>
 		<hr>
 		<label for="psuinput">EMS Memory Adapter export file (.psu) goes here:</label>
 		<input type="file" id="psuinput" name="psuinput" accept=".psu" />
@@ -65,10 +71,16 @@
 		<label for="psvinput">PS3 export file (.psv) goes here:</label>
 		<input type="file" id="psvinput" name="psvinput" accept=".psv" />
 		<br>
+		<label for="spsinput">SharkPort/X-Port export file (.sps, .xps) goes here:</label>
+		<input type="file" id="spsinput" name="spsinput" accept=".sps, .xps" />
+		<br>
 		<p>
 			<span>Date created: </span><span id="dateCreated">--:--:-- --/--/----</span><span> UTC+09:00</span>
 			<br>
 			<span>Date modified: </span><span id="dateModified">--:--:-- --/--/----</span><span> UTC+09:00</span>
+		</p>
+		<p>
+			<span>File comments: </span><span id="fileCommentGame">(no title)</span></span><span> - </span><span id="fileCommentName">(no description)</span>
 		</p>
 		<!-- TODO MAKE NEW DISPLAY BOXES !-->
 		<script>
@@ -197,6 +209,35 @@
 					}
 				});
 			}
+			spsbox = document.getElementById("spsinput");
+			spsbox.onchange = function(e) {
+				resetDisplay();
+				if(spsbox.files.length === 0) {
+					return;
+				}
+				spsbox.files[0].arrayBuffer().then(function(d){
+					try {
+						let vFilesystem = readSharkXPortSxpsFile(d);
+						let output = readPS2D(vFilesystem[vFilesystem.rootDirectory]["icon.sys"].data);
+						updateDisplay(output);
+						let output2 = new Object();
+						Object.keys(output.filenames).forEach(function(file) {
+							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
+						});
+						let cTime = vFilesystem.timestamps.created;
+						let mTime = vFilesystem.timestamps.modified;
+						//TODO: use Time() to align JST times to user-local timezone
+						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
+						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
+						document.getElementById("fileCommentGame").textContent = vFilesystem.comments.game;
+						document.getElementById("fileCommentName").textContent = vFilesystem.comments.name;
+						console.log("model files", output2);
+					} catch(e) {
+						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
+						alert(e);
+					}
+				});
+			}
 			function createShader(gl, type, source) {
 				var shader = gl.createShader(type);
 				gl.shaderSource(shader, source);
@@ -255,6 +296,9 @@
 				glContext.drawArrays(glContext.TRIANGLE_STRIP, 0, 4);
 			} else {
 				canvas.style.display = "none";
+			}
+			document.getElementById("showExtractedInputOption").onchange = function(e) {
+				document.getElementById("advanced").style.display = ((e.target.checked) ? "block" : "none");
 			}
 			//todo: Model rendering, animation parsing, animation tweening
 		</script>

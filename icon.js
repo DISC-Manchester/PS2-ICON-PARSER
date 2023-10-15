@@ -1,7 +1,7 @@
 //todo: Make this a module/mjs file. C6 compatibility can stay, if needed.
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
-ICONJS_VERSION = "0.3.4";
+ICONJS_VERSION = "0.3.5";
 
 function setDebug(value) {
 	ICONJS_DEBUG = !!value;
@@ -65,7 +65,8 @@ function readPS2D(input) {
 		{r: f32le(160), g: f32le(164), b: f32le(168), a: f32le(172)},
 		{r: f32le(176), g: f32le(180), b: f32le(184), a: f32le(188)}	
 	]
-	// save builder says color 1 is ambient, 2-4 are for 3-point cameras
+	// P2SB says color 1 is ambient, 2-4 are for 3-point cameras
+	// official HDD icon.sys files (completely different PS2ICON text-based format) also say the same.
 	const int_title = input.slice(0xc0, 0x100);
 	const tmp_title16 = new Uint16Array(int_title);
 	for (let index = 0; index < 32; index++) {
@@ -214,7 +215,6 @@ function readIconFile(input) {
 function readEntryBlock(input) {
 	const view = new DataView(input);
 	const u32le = function(i){return view.getUint32(i, 1)};
-	const u16le = function(i){return view.getUint16(i, 1)};
 	const t64le = function(i){return {
 		seconds: view.getUint8(i+1),
 		minutes: view.getUint8(i+2),
@@ -254,6 +254,9 @@ function readEntryBlock(input) {
 
 function readEmsPsuFile(input){
 	const header = readEntryBlock(input.slice(0,0x1ff));
+	if(header.size > 0x7f) {
+		throw `Directory is too large! (maximum size: ${0x7f}, was ${header.size})`
+	}
 	let fsOut = {length: header.size, rootDirectory: header.filename, timestamps: {created: header.createdTime, modified: header.modifiedTime}};
 	let output = new Object();
 	let offset = 512;
@@ -346,7 +349,106 @@ function readPsvFile(input){
 	return {icons, "icon.sys": input.slice(ps2dOffset, ps2dOffset+ps2dSize), timestamps};
 }
 
+function readSxpsDescriptor(input) {
+	const view = new DataView(input);
+	const u32le = function(i){return view.getUint32(i, 1)};
+	const t64le = function(i){return {
+		seconds: view.getUint8(i+1),
+		minutes: view.getUint8(i+2),
+		hours: view.getUint8(i+3),
+		day: view.getUint8(i+4),
+		month: view.getUint8(i+5),
+		year: view.getUint16(i+6, 1)
+	}}; //NOTE: times are in JST timezone (GMT+09:00), so clients should implement correctly!
+	//!pattern sps-xps_file.hexpat
+	//:skip 2 // ... it's the file descriptor block size (including the bytes themselves, so 250)
+	const int_filename = input.slice(2, 66);
+	const filename = stringScrubber((new TextDecoder("utf-8")).decode(int_filename));
+	const size = u32le(66);
+	const startSector = u32le(70);
+	const endSector = u32le(74);
+	const permissions = u32le(78); // the first two bytes are *swapped*. The comments that ensued were not kept.
+	let type;
+	if (permissions>0xffff) {
+		throw `Not a SharkPort (SPS) or X-Port (XPS) export file (was ${permissions}, expected less than ${0xffff})`;
+	}
+	if((permissions & 0b0010000000000000)>=1){
+		type = "directory";
+	}
+	if((permissions & 0b0001000000000000)>=1){
+		type = "file";
+	}
+	if((permissions & 0b00011000)>=1){
+		throw `I don't parse portable applications or legacy save data. (${permissions} has bits 4 or 5 set)`;
+	}
+	const timestamps = {created: t64le(82), modified: t64le(90)};
+	//:skip 4
+	//:skip 4 - u32 optional (98)
+	//:skip 8 - t64 optionalTime (102) // I don't know why this is here.
+	const int_asciiName = input.slice(114, 178);
+	const int_shiftjisName = input.slice(178, 242); // Because why parse a PS2D when you can hard-code it?
+	//:skip 8
+	if(ICONJS_DEBUG) {
+		console.log({int_filename, size, startSector, endSector, permissions, type, timestamps, int_asciiName, int_shiftjisName});
+	}
+	return {type, size, filename, timestamps};
+}
+
+function readSharkXPortSxpsFile(input) {
+	const view = new DataView(input);
+	const u32le = function(i){return view.getUint32(i, 1)};
+	//!pattern sps-xps_file.hexpat
+	const identLength = u32le(0);
+	let offset = 4;
+	const ident = input.slice(offset, offset+identLength);
+	if((new TextDecoder("utf-8")).decode(ident) !== "SharkPortSave") {
+		throw `Unrecognized file identification string. Expected "SharkPortSave".`
+	}
+	offset += (identLength + 4);
+	const titleLength = u32le(offset);
+	const title = input.slice(offset + 4, (offset + 4) + titleLength);
+	offset += (titleLength + 4);
+	const descriptionLength = u32le(offset);
+	const description = input.slice(offset + 4, (offset + 4) + descriptionLength);
+	offset += (descriptionLength + 8);
+	const comments = {
+		"game": stringScrubber((new TextDecoder("utf-8")).decode(title)),
+		"name": stringScrubber((new TextDecoder("utf-8")).decode(description))
+	}
+	const totalSize = u32le(offset);
+	offset += 4;
+	const header = readSxpsDescriptor(input.slice(offset, offset + 250));
+	offset += 250;
+	// alright now lets parse some actual data
+	let fsOut = {length: header.size, rootDirectory: header.filename, timestamps: header.timestamps, comments};
+	let output = new Object();
+	for (let index = 0; index < (header.size - 2); index++) {
+		fdesc = readSxpsDescriptor(input.slice(offset, offset + 250));
+		switch(fdesc.type) {
+			case "directory": {
+				offset += 250;
+				output[fdesc.filename] = null;
+				break;
+			}
+			case "file": {
+				if(ICONJS_DEBUG){
+					console.log(`PARSING | F: "${fdesc.filename}" O: ${offset} S: ${fdesc.size}`);
+				}
+				offset += 250;
+				output[fdesc.filename] = {
+					size: fdesc.size,
+					data: input.slice(offset, offset+fdesc.size)
+				};
+				offset += fdesc.size;
+				break;
+			}
+		}
+	}
+	fsOut[header.filename] = output;
+	return fsOut;
+}
+
 if(typeof module !== "undefined") {
 	// for C6JS
-	module.exports = {readIconFile, readPS2D, readEmsPsuFile, setDebug, setStrictness};
+	module.exports = {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, setDebug, setStrictness};
 }
