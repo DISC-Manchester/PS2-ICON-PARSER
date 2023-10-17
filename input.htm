@@ -28,26 +28,7 @@
 			attribute vec4 a_color;
 			
 			varying lowp vec4 v_color;
-			
-			void main() {
-				// x, y, z, scale (w)
-				gl_Position = vec4(
-					a_position.x,
-					(0.0 - a_position.y) - 2.75, // invert the y position and move down -2.75, which will center the model
-					a_position.z,
-					3.0
-				);
-				// flip it, scale it
-				v_color = a_color;
-			}
-		</script>
-		<script type="text/plain" id="shader-icon-v2">
-			attribute vec3 a_position;
-			attribute vec3 a_normal;
-			attribute vec2 a_textureCoords;
-			attribute vec4 a_color;
-			
-			varying highp vec2 v_textureCoords;
+			varying lowp vec2 v_textureCoords;
 			
 			void main() {
 				// x, y, z, scale (w)
@@ -59,6 +40,7 @@
 				);
 				// flip it, scale it
 				v_textureCoords = a_textureCoords;
+				v_color = a_color;
 			}
 		</script>
 		<script type="text/plain" id="shader-icon-f">
@@ -69,7 +51,7 @@
 			}
 		</script>
 		<script type="text/plain" id="shader-icon-f2">
-			varying highp vec2 v_textureCoords;
+			varying lowp vec2 v_textureCoords;
 			uniform sampler2D u_sampler;
 
 			void main() {
@@ -179,68 +161,27 @@
 				document.getElementById("icond").textContent = "?";
 				document.getElementById("dateCreated").textContent = "--:--:-- --/--/----";
 				document.getElementById("dateModified").textContent = "--:--:-- --/--/----";
-			}
-			function uncompressTexture(texData) {
-				const view = new DataView(texData);
-				const u16le = function(i){return view.getUint16(i, 1)}
-				let uncompressed = new Uint16Array(16384);
-				for (let index = 0; index < 16384; index++) {
-					currentValue = u16le(index);
-					console.log(index, currentValue);
-					if (currentValue >= 0xff00) {
-						//do a raw copy
-						let length = ((0x10000 - currentValue));
-						for (let enumerator = 0; enumerator < length; enumerator++) {
-							console.log("i'm here", index, (index*2), u16le(index), u16le(index *2), ((index * 2) -2), u16le((index * 2) -2))
-							uncompressed[index-1] = u16le((index * 2) -2);
-							index++;
-						}
-					} else {
-						//repeat next byte rleType times
-						let original = index;
-						for (let indey = 0; indey < currentValue; indey++) {
-							uncompressed[index++] = u16le(original+2);
-						}
-					}
-				}
-				return uncompressed;
+				document.getElementById("fileCommentGame").textContent = "(no title)";
+				document.getElementById("fileCommentName").textContent = "(no description)";
 			}
 			function renderIcon(iconData) {
 				if(glFgContext === null) {return -1;} else {
 					const texture = glFgContext.createTexture();
 					glFgContext.bindTexture(glFgContext.TEXTURE_2D, texture);
-					if (iconData.textureFormat === "U") {
-						glFgContext.texImage2D(glFgContext.TEXTURE_2D, 0, glFgContext.RGBA, 128, 128, 0, glFgContext.RGBA, glFgContext.UNSIGNED_SHORT_5_5_5_1, iconData.texture);
-						glFgContext.generateMipmap(glFgContext.TEXTURE_2D);
-					}
-					if (iconData.textureFormat === "C") {
-						let uncompressed = uncompressTexture(iconData.texture.data);
-						console.log(uncompressed);
-						/*
-						let uncompressed = new Uint16Array([
-							63551, 63551,     1,     1, 63551, 63551,     1,     1,
-							63551, 63551,     1,     1, 63551, 63551,     1,     1,
-							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
-							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
-							63551, 63551,     1,     1, 63551, 63551,     1,     1,
-							63551, 63551,     1,     1, 63551, 63551,     1,     1,
-							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
-							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
-							63551, 63551,     1,     1, 63551, 63551,     1,     1,
-							63551, 63551,     1,     1, 63551, 63551,     1,     1,
-							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
-							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
-							63551, 63551,     1,     1, 63551, 63551,     1,     1,
-							63551, 63551,     1,     1, 63551, 63551,     1,     1,
-							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
-							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
-						]);*/
-						glFgContext.texImage2D(glFgContext.TEXTURE_2D, 0, glFgContext.RGBA, 128, 128, 0, glFgContext.RGBA, glFgContext.UNSIGNED_SHORT_5_5_5_1, uncompressed);
+					if (iconData.textureFormat !== "N") {
+						let rgb5a1_converted;
+						if (iconData.textureFormat === "C") {
+							let uncompressed = uncompressTexture(iconData.texture.data);
+							rgb5a1_converted = convertBGR5A1toRGB5A1(uncompressed.buffer);
+						} else {
+							rgb5a1_converted = convertBGR5A1toRGB5A1(iconData.texture.buffer);
+						}
+						glFgContext.texImage2D(glFgContext.TEXTURE_2D, 0, glFgContext.RGBA, 128, 128, 0, glFgContext.RGBA, glFgContext.UNSIGNED_SHORT_5_5_5_1, rgb5a1_converted);
 						glFgContext.generateMipmap(glFgContext.TEXTURE_2D);
 					}
 					//.section PROGRAM.icon
 					if(iconData.textureFormat !== "N") {
-						var iconVertexShader = createShader(glFgContext, glFgContext.VERTEX_SHADER, document.getElementById("shader-icon-v2").text);
+						var iconVertexShader = createShader(glFgContext, glFgContext.VERTEX_SHADER, document.getElementById("shader-icon-v").text);
 						var iconFragmentShader = createShader(glFgContext, glFgContext.FRAGMENT_SHADER, document.getElementById("shader-icon-f2").text);
 					} else {
 						var iconVertexShader = createShader(glFgContext, glFgContext.VERTEX_SHADER, document.getElementById("shader-icon-v").text);
@@ -385,7 +326,7 @@
 						let inputData = readPsvFile(d);
 						let output = readPS2D(inputData["icon.sys"]);
 						updateDisplay(output);
-						renderIcon(inputData.icons.n);
+						renderIcon(readIconFile(inputData.icons.n));
 						let cTime = inputData.timestamps.created;
 						let mTime = inputData.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
@@ -506,10 +447,10 @@
 			document.getElementById("showExtractedInputOption").onchange = function(e) {
 				document.getElementById("advanced").style.display = ((e.target.checked) ? "block" : "none");
 			}
-			//todo: Texture parsing, Animation parsing, animation tweening
+			//todo: Animation parsing, animation tweening, whatever's going on with texture type 15
 		</script>
 		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] - &copy; 2023 yellows111</span>
 		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>
-		<script>document.getElementById("clientVersion").textContent = "0.4.3";</script>
+		<script>document.getElementById("clientVersion").textContent = "0.5.1";</script>
 	</body>
 </html>

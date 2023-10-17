@@ -1,7 +1,7 @@
 //todo: Make this a module/mjs file. C6 compatibility can stay, if needed.
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
-ICONJS_VERSION = "0.3.5";
+ICONJS_VERSION = "0.4.0";
 
 function setDebug(value) {
 	ICONJS_DEBUG = !!value;
@@ -26,9 +26,60 @@ function getTextureFormat(i) {
 	}
 }
 
-function BGR5A1(i) {
-	return {b: (i & 0b11111), g: ((i >> 5) & 0b11111), r: ((i >> 10) & 0b11111), a: (i >> 15)}
-	// map this as *8 for each color and i+1*127 for alpha, GL-wise, float(i+1)
+function uncompressTexture(texData) {
+	// for texture formats 8-14 (and maybe 15 but that's being weird)
+	if (texData.length & 1) {
+		throw "Texture size isn't a multiple of 2 (was ${texData.length})";
+	}
+	const view = new DataView(texData);
+	const u16le = function(i){return view.getUint16(i, 1)}
+	let uncompressed = new Uint16Array(16384);
+	let offset = 0;
+	for (let index = 0; index < 16384; index++) {
+		currentValue = u16le(offset);
+		offset += 2;
+		if (currentValue >= 0xff00) {
+			//do a raw copy
+			let length = ((0x10000 - currentValue));
+			for (let enumerator = 0; enumerator < length; enumerator++) {
+				uncompressed[index] = u16le(offset);
+				offset += 2;
+				index++;
+			}
+		} else {
+			//repeat next byte rleType times
+			uncompressed[index] = u16le(offset);
+			for (let indey = 0; indey < currentValue; indey++) {
+				uncompressed[index] = u16le(offset);
+				index++
+			}
+			offset += 2;
+		}
+		index--;
+	}
+	return uncompressed;
+}
+
+function convertBGR5A1toRGB5A1(bgrData) {
+	if(bgrData.byteLength !== 32768) {
+		throw `Not a 128x128x16 texture. (length was ${bgrData.length})`;
+	}
+	// converts 5-bit blue, green, red (in that order) with one alpha bit to GL-compatible RGB5A1
+	const view = new DataView(bgrData);
+	const u16le = function(i){return view.getUint16(i, 1)}
+	let converted = new Uint16Array(16384);
+	for (let index = 0; index < 16384; index++) {
+		let b = (  u16le(index*2)          & 0b11111);
+		let g = (((u16le(index*2)) >>  5) & 0b11111);
+		let r = (((u16le(index*2)) >> 10) & 0b11111);
+		//               rrrrrgggggbbbbba (a = 1 because 0 is 127 which is 1.0f opacity for the GS)
+		let newValue = 0b0000000000000001;
+		newValue |= (r << 1);
+		newValue |= (g << 6);
+		newValue |= (b << 11);
+		converted[index] = newValue;
+	}
+	return converted;
 }
 
 function stringScrubber(dirty) {
@@ -107,7 +158,8 @@ function readIconFile(input) {
 		r: (i & 0xff), 
 		g: ((i & 0xff00) >> 8), 
 		b: ((i & 0xff0000) >> 16), 
-		a: (i > 0x7fffffff ? 255 : (((i & 0xff000000) >>> 24) * 2)+1)
+		//a: (i > 0x7fffffff ? 255 : (((i & 0xff000000) >>> 24) * 2)+1)
+		a: 255 // I don't think alpha transparency is actually USED in icons?
 	}};
 	const magic = u32le(0);
 	if (magic !== 0x010000) {
@@ -190,7 +242,7 @@ function readIconFile(input) {
 			* u16 rleType;
 			* if (rleType >= 0xff00) {
 			*	//do a raw copy
-			*	let length = (0xffff - rleType);
+			*	let length = (0x10000 - rleType);
 			*	byte data[length];
 			* } else {
 			*	//repeat next byte rleType times
@@ -201,7 +253,7 @@ function readIconFile(input) {
 			* }
 			**/
 			//output of this will be another u16[0x4000] of the decompressed texture
-			//after that just parse output as-if it was uncompressed, I think.
+			//after that just parse output as-if it was uncompressed.
 			size = u32le(offset);
 			texture = {size, data: input.slice(offset+4, offset+(4+size))};
 		}
@@ -399,6 +451,9 @@ function readSharkXPortSxpsFile(input) {
 	const u32le = function(i){return view.getUint32(i, 1)};
 	//!pattern sps-xps_file.hexpat
 	const identLength = u32le(0);
+	if(identLength !== 13) {
+		throw `Not a SharkPort (SPS) or X-Port (XPS) export file (was ${identLength}, expected 13)`;
+	}
 	let offset = 4;
 	const ident = input.slice(offset, offset+identLength);
 	if((new TextDecoder("utf-8")).decode(ident) !== "SharkPortSave") {
@@ -445,6 +500,7 @@ function readSharkXPortSxpsFile(input) {
 		}
 	}
 	fsOut[header.filename] = output;
+	//:skip 4 //  then here lies, at offset (the end of file), a u32 checksum.
 	return fsOut;
 }
 
