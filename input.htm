@@ -11,14 +11,14 @@
 			#title1, #title2 {
 				color: yellow;
 				text-align: right;
-				/*text-shadow: -2px 0 black, 0 2px black, 2px 0 black, 0 -2px black;*/
-				right: 8px;
-				position: relative;
-				margin: 0;
+				line-height: 0.50em;
 			}
 			#version {position: fixed;bottom:4px;right:4px}
 			#advanced {display: none}
 			#iconcanvas {position: absolute; left: 8px}
+			#titlebox {width: 99%;position: absolute;}
+			input[type="file"] {line-height: 2em;}
+			#version {text-shadow: 1px 1px 2px black;}
 		</style>
 		<meta data-comment="WebGL Shader: Icon">
 		<script type="text/plain" id="shader-icon-v">
@@ -87,9 +87,10 @@
 		<label for="showExtractedInputOption">show other import options</label>
 		<input id="showExtractedInputOption" type="checkbox"></input>
 		<hr>
-		<br>
-		<h1 id="title1">&#xFF2E;&#xFF4F;&#x3000;&#xFF26;&#xFF49;&#xFF4C;&#xFF45;</h1> 
-		<h1 id="title2">&#xFF2C;&#xFF4F;&#xFF41;&#xFF44;&#xFF45;&#xFF44;</h1>
+		<div id="titlebox">
+			<h1 id="title1">&#xFF2E;&#xFF4F;&#x3000;&#xFF26;&#xFF49;&#xFF4C;&#xFF45;</h1> 
+			<h1 id="title2">&#xFF2C;&#xFF4F;&#xFF41;&#xFF44;&#xFF45;&#xFF44;</h1>
+		</div>
 		<span>Background/icon preview:</span><br>
 		<canvas id="bgcanvas" width="360" height="360"></canvas>
 		<canvas id="iconcanvas" width="360" height="360"></canvas>
@@ -116,7 +117,7 @@
 		<br>
 		<p>
 			<span>Date created: </span><span id="dateCreated">--:--:-- --/--/----</span><span> UTC+09:00</span>
-			<br>
+			<span> | </span>
 			<span>Date modified: </span><span id="dateModified">--:--:-- --/--/----</span><span> UTC+09:00</span>
 		</p>
 		<p>
@@ -252,6 +253,8 @@
 				if(!!filebox.files.length) {filebox.onchange();}
 				if(!!iconbox.files.length) {iconbox.onchange();}
 				if(!!psubox.files.length) {psubox.onchange();}
+				if(!!psvbox.files.length) {psvbox.onchange();}
+				if(!!spsbox.files.length) {spsbox.onchange();}
 			}
 			filebox = document.getElementById("input");
 			filebox.onchange = function(e) {
@@ -447,7 +450,7 @@
 			document.getElementById("showExtractedInputOption").onchange = function(e) {
 				document.getElementById("advanced").style.display = ((e.target.checked) ? "block" : "none");
 			}
-			//todo: Animation parsing, animation tweening, whatever's going on with texture type 15
+			//todo: Animation parsing, animation tweening
 		</script>
 		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] - &copy; 2023 yellows111</span>
 		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>

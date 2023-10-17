@@ -37,6 +37,12 @@ function uncompressTexture(texData) {
 	let offset = 0;
 	for (let index = 0; index < 16384; index++) {
 		currentValue = u16le(offset);
+		if(currentValue === 0) {
+			// if this is specifically a katamari 1 or 2 icon, skip this byte
+			// because it's formatted like that for some reason
+			offset += 2;
+			currentValue = u16le(offset);
+		}
 		offset += 2;
 		if (currentValue >= 0xff00) {
 			//do a raw copy
