@@ -18,19 +18,78 @@
 			}
 			#version {position: fixed;bottom:4px;right:4px}
 			#advanced {display: none}
+			#iconcanvas {position: absolute; left: 8px}
 		</style>
-		<script type="text/plain" id="verts1">
-			attribute vec4 a_position;
+		<meta data-comment="WebGL Shader: Icon">
+		<script type="text/plain" id="shader-icon-v">
+			attribute vec3 a_position;
+			attribute vec3 a_normal;
+			attribute vec2 a_textureCoords;
+			attribute vec4 a_color;
+			
+			varying lowp vec4 v_color;
+			
+			void main() {
+				// x, y, z, scale (w)
+				gl_Position = vec4(
+					a_position.x,
+					(0.0 - a_position.y) - 2.75, // invert the y position and move down -2.75, which will center the model
+					a_position.z,
+					3.0
+				);
+				// flip it, scale it
+				v_color = a_color;
+			}
+		</script>
+		<script type="text/plain" id="shader-icon-v2">
+			attribute vec3 a_position;
+			attribute vec3 a_normal;
+			attribute vec2 a_textureCoords;
+			attribute vec4 a_color;
+			
+			varying highp vec2 v_textureCoords;
+			
+			void main() {
+				// x, y, z, scale (w)
+				gl_Position = vec4(
+					a_position.x,
+					(0.0 - a_position.y) - 2.75, // invert the y position and move down -2.75, which will center the model
+					a_position.z,
+					3.0
+				);
+				// flip it, scale it
+				v_textureCoords = a_textureCoords;
+			}
+		</script>
+		<script type="text/plain" id="shader-icon-f">
+			varying lowp vec4 v_color;
+
+			void main() {
+				gl_FragColor = v_color;
+			}
+		</script>
+		<script type="text/plain" id="shader-icon-f2">
+			varying highp vec2 v_textureCoords;
+			uniform sampler2D u_sampler;
+
+			void main() {
+				gl_FragColor = texture2D(u_sampler, v_textureCoords);
+			}
+		</script>
+		<meta data-comment="WebGL Shader: Background">
+		<script type="text/plain" id="shader-bg-v">
+			attribute vec2 a_position;
 			attribute vec4 a_color;
 			
 			varying lowp vec4 vColor;
 
 			void main() {
-				gl_Position = a_position;
+				// x, y, z, scale (w)
+				gl_Position = vec4(a_position, 0.99, 1.0);
 				vColor = a_color;
 			}
 		</script>
-		<script type="text/plain" id="frags1">
+		<script type="text/plain" id="shader-bg-f">
 			precision mediump float;
 			varying lowp vec4 vColor;
 
@@ -49,12 +108,11 @@
 		<br>
 		<h1 id="title1">&#xFF2E;&#xFF4F;&#x3000;&#xFF26;&#xFF49;&#xFF4C;&#xFF45;</h1> 
 		<h1 id="title2">&#xFF2C;&#xFF4F;&#xFF41;&#xFF44;&#xFF45;&#xFF44;</h1>
-		<span>Background preview:</span><br>
-		<canvas id="iconcanvas" width="240" height="240"></canvas>
+		<span>Background/icon preview:</span><br>
+		<canvas id="bgcanvas" width="360" height="360"></canvas>
+		<canvas id="iconcanvas" width="360" height="360"></canvas>
 		<hr>
-		<p>Normal: <kbd id="iconn">(no file)</kbd></p>
-		<p>Copying: <kbd id="iconc">(no file)</kbd></p>
-		<p>Deleting: <kbd id="icond">(no file)</kbd></p>
+		<p>Normal: <kbd id="iconn">(no file)</kbd> Copying: <kbd id="iconc">(no file)</kbd> Deleting: <kbd id="icond">(no file)</kbd></p>
 		<div id="advanced">
 			<hr>
 			<label for="input">icon.sys goes here:</label>
@@ -82,36 +140,35 @@
 		<p>
 			<span>File comments: </span><span id="fileCommentGame">(no title)</span></span><span> - </span><span id="fileCommentName">(no description)</span>
 		</p>
-		<!-- TODO MAKE NEW DISPLAY BOXES !-->
 		<script>
-			// i know this is sinful, but i don't want to load from an event again
+			// I usually don't do in-body <script>'s, but I didn't want to do an await onload again
 			function updateDisplay(input) {
 				document.getElementById("title1").textContent = input.title[0];
 				document.getElementById("title2").textContent = input.title[1];
 				document.getElementById("iconn").textContent = input.filenames.n;
 				document.getElementById("iconc").textContent = input.filenames.c;
 				document.getElementById("icond").textContent = input.filenames.d;
-				if(glContext !== null) {
+				let colours = input.background;
+				if(glBgContext !== null) {
 					colors = [
-						input.background.colors[0].r/255,
-						input.background.colors[0].g/255,
-						input.background.colors[0].b/255,
-						input.background.alpha*2,
-						input.background.colors[1].r/255,
-						input.background.colors[1].g/255,
-						input.background.colors[1].b/255,
-						input.background.alpha*2,
-						input.background.colors[2].r/255,
-						input.background.colors[2].g/255,
-						input.background.colors[2].b/255,
-						input.background.alpha*2,
-						input.background.colors[3].r/255,
-						input.background.colors[3].g/255,
-						input.background.colors[3].b/255,
-						input.background.alpha*2
+						colours.colors[0].r/255,
+						colours.colors[0].g/255,
+						colours.colors[0].b/255,
+						(colours.alpha*2)/255,
+						colours.colors[1].r/255,
+						colours.colors[1].g/255,
+						colours.colors[1].b/255,
+						(colours.alpha*2)/255,
+						colours.colors[2].r/255,
+						colours.colors[2].g/255,
+						colours.colors[2].b/255,
+						(colours.alpha*2)/255,
+						colours.colors[3].r/255,
+						colours.colors[3].g/255,
+						colours.colors[3].b/255,
+						(colours.alpha*2)/255
 					];
-					glContext.bufferData(glContext.ARRAY_BUFFER, new Float32Array(colors), glContext.STATIC_DRAW);
-					glContext.drawArrays(glContext.TRIANGLE_STRIP, 0, 4);
+					drawBackground(colors);
 				}
 			}
 			function resetDisplay() {
@@ -122,6 +179,132 @@
 				document.getElementById("icond").textContent = "?";
 				document.getElementById("dateCreated").textContent = "--:--:-- --/--/----";
 				document.getElementById("dateModified").textContent = "--:--:-- --/--/----";
+			}
+			function uncompressTexture(texData) {
+				const view = new DataView(texData);
+				const u16le = function(i){return view.getUint16(i, 1)}
+				let uncompressed = new Uint16Array(16384);
+				for (let index = 0; index < 16384; index++) {
+					currentValue = u16le(index);
+					console.log(index, currentValue);
+					if (currentValue >= 0xff00) {
+						//do a raw copy
+						let length = ((0x10000 - currentValue));
+						for (let enumerator = 0; enumerator < length; enumerator++) {
+							console.log("i'm here", index, (index*2), u16le(index), u16le(index *2), ((index * 2) -2), u16le((index * 2) -2))
+							uncompressed[index-1] = u16le((index * 2) -2);
+							index++;
+						}
+					} else {
+						//repeat next byte rleType times
+						let original = index;
+						for (let indey = 0; indey < currentValue; indey++) {
+							uncompressed[index++] = u16le(original+2);
+						}
+					}
+				}
+				return uncompressed;
+			}
+			function renderIcon(iconData) {
+				if(glFgContext === null) {return -1;} else {
+					const texture = glFgContext.createTexture();
+					glFgContext.bindTexture(glFgContext.TEXTURE_2D, texture);
+					if (iconData.textureFormat === "U") {
+						glFgContext.texImage2D(glFgContext.TEXTURE_2D, 0, glFgContext.RGBA, 128, 128, 0, glFgContext.RGBA, glFgContext.UNSIGNED_SHORT_5_5_5_1, iconData.texture);
+						glFgContext.generateMipmap(glFgContext.TEXTURE_2D);
+					}
+					if (iconData.textureFormat === "C") {
+						let uncompressed = uncompressTexture(iconData.texture.data);
+						console.log(uncompressed);
+						/*
+						let uncompressed = new Uint16Array([
+							63551, 63551,     1,     1, 63551, 63551,     1,     1,
+							63551, 63551,     1,     1, 63551, 63551,     1,     1,
+							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
+							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
+							63551, 63551,     1,     1, 63551, 63551,     1,     1,
+							63551, 63551,     1,     1, 63551, 63551,     1,     1,
+							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
+							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
+							63551, 63551,     1,     1, 63551, 63551,     1,     1,
+							63551, 63551,     1,     1, 63551, 63551,     1,     1,
+							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
+							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
+							63551, 63551,     1,     1, 63551, 63551,     1,     1,
+							63551, 63551,     1,     1, 63551, 63551,     1,     1,
+							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
+							    1,     1, 63551, 63551,     1,     1, 63551, 63551,
+						]);*/
+						glFgContext.texImage2D(glFgContext.TEXTURE_2D, 0, glFgContext.RGBA, 128, 128, 0, glFgContext.RGBA, glFgContext.UNSIGNED_SHORT_5_5_5_1, uncompressed);
+						glFgContext.generateMipmap(glFgContext.TEXTURE_2D);
+					}
+					//.section PROGRAM.icon
+					if(iconData.textureFormat !== "N") {
+						var iconVertexShader = createShader(glFgContext, glFgContext.VERTEX_SHADER, document.getElementById("shader-icon-v2").text);
+						var iconFragmentShader = createShader(glFgContext, glFgContext.FRAGMENT_SHADER, document.getElementById("shader-icon-f2").text);
+					} else {
+						var iconVertexShader = createShader(glFgContext, glFgContext.VERTEX_SHADER, document.getElementById("shader-icon-v").text);
+						var iconFragmentShader = createShader(glFgContext, glFgContext.FRAGMENT_SHADER, document.getElementById("shader-icon-f").text);
+					}
+					var iconProgram = createProgram(glFgContext, iconVertexShader, iconFragmentShader);
+					glFgContext.useProgram(iconProgram);
+					if(iconData.textureFormat !== "N") {
+						var attributes = {
+							position: glFgContext.getAttribLocation(iconProgram, "a_position"),
+							textureCoords: glFgContext.getAttribLocation(iconProgram, "a_textureCoords")
+						};
+						var uniforms = {
+							sampler: glFgContext.getUniformLocation(iconProgram, "u_sampler")
+						}
+					} else {
+						var attributes = {
+							position: glFgContext.getAttribLocation(iconProgram, "a_position"),
+							color: glFgContext.getAttribLocation(iconProgram, "a_color")
+						};
+					}
+					//.section SETUP
+					let verticesArray = new Array();
+					let colourArray = new Array();
+					let uvArray = new Array();
+					iconData.vertices.forEach(function(vertexObject){
+						verticesArray.push(vertexObject.shapes[0].x);
+						verticesArray.push(vertexObject.shapes[0].y);
+						verticesArray.push(vertexObject.shapes[0].z);
+						colourArray.push(vertexObject.color.r/255);
+						colourArray.push(vertexObject.color.g/255);
+						colourArray.push(vertexObject.color.b/255);
+						colourArray.push(vertexObject.color.a/255);
+						uvArray.push(vertexObject.uv.u);
+						uvArray.push(vertexObject.uv.v);
+					});
+					//.section VERTICES
+					const positionBuffer = glFgContext.createBuffer();
+					glFgContext.bindBuffer(glFgContext.ARRAY_BUFFER, positionBuffer);
+					glFgContext.enableVertexAttribArray(attributes.position);
+					glFgContext.bufferData(glFgContext.ARRAY_BUFFER, new Float32Array(verticesArray), glFgContext.STATIC_DRAW);
+					glFgContext.vertexAttribPointer(attributes.position, 3, glFgContext.FLOAT, false, 0, 0);
+					if(iconData.textureFormat === "N") {
+						//.section COLOURS
+						const colorBuffer = glFgContext.createBuffer();
+						glFgContext.bindBuffer(glFgContext.ARRAY_BUFFER, colorBuffer);
+						glFgContext.enableVertexAttribArray(attributes.color);
+						glFgContext.bufferData(glFgContext.ARRAY_BUFFER, new Float32Array(colourArray), glFgContext.STATIC_DRAW);
+						glFgContext.vertexAttribPointer(attributes.color, 4, glFgContext.FLOAT, false, 0, 0);
+					} else {
+						//.section UV
+						const uvBuffer = glFgContext.createBuffer();
+						glFgContext.bindBuffer(glFgContext.ARRAY_BUFFER, uvBuffer);
+						glFgContext.enableVertexAttribArray(attributes.textureCoords);
+						glFgContext.bufferData(glFgContext.ARRAY_BUFFER, new Float32Array(uvArray), glFgContext.STATIC_DRAW);
+						glFgContext.vertexAttribPointer(attributes.textureCoords, 2, glFgContext.FLOAT, false, 0, 0);
+						//.section TEXTURE
+						glFgContext.activeTexture(glFgContext.TEXTURE0);
+						glFgContext.bindTexture(glFgContext.TEXTURE_2D, texture);
+						glFgContext.uniform1i(uniforms.sampler, 0);
+					}
+					//.section WRITE
+					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, (verticesArray.length/3));
+				}
 			}
 			document.getElementById("strictnessOption").onchange = function(e) {
 				setStrictness(e.target.checked);
@@ -141,7 +324,7 @@
 						console.log("icon.sys", output);
 						updateDisplay(output);
 					} catch(e) {
-						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
+						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						alert(e);
 					}
 				});
@@ -154,8 +337,10 @@
 				iconbox.files[0].arrayBuffer().then(function(d){
 					try {
 						let output = readIconFile(d);
+						renderIcon(output);
 						console.log("model data",output);
 					} catch(e) {
+						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
 						alert(e);
 					}
 				});
@@ -175,6 +360,7 @@
 						Object.keys(output.filenames).forEach(function(file) {
 							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
 						});
+						renderIcon(output2.n);
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
@@ -182,7 +368,8 @@
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
 						console.log("model files", output2);
 					} catch(e) {
-						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
+						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
+						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
 						alert(e);
 					}
 				});
@@ -198,13 +385,15 @@
 						let inputData = readPsvFile(d);
 						let output = readPS2D(inputData["icon.sys"]);
 						updateDisplay(output);
+						renderIcon(inputData.icons.n);
 						let cTime = inputData.timestamps.created;
 						let mTime = inputData.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
 						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
 					} catch(e) {
-						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
+						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
+						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
 						alert(e);
 					}
 				});
@@ -224,6 +413,7 @@
 						Object.keys(output.filenames).forEach(function(file) {
 							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
 						});
+						renderIcon(output2.n);
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
@@ -233,7 +423,8 @@
 						document.getElementById("fileCommentName").textContent = vFilesystem.comments.name;
 						console.log("model files", output2);
 					} catch(e) {
-						if(glContext!==null){glContext.clear(glContext.COLOR_BUFFER_BIT);}
+						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
+						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
 						alert(e);
 					}
 				});
@@ -263,46 +454,62 @@
 				console.log(gl.getProgramInfoLog(program));
 				gl.deleteProgram(program);
 			}
-			const canvas = document.getElementById("iconcanvas");
-			const glContext = canvas.getContext("webgl");
-			if(glContext !== null) {
-				//.section PROGRAM
-				var vertexShader = createShader(glContext, glContext.VERTEX_SHADER, document.getElementById("verts1").text);
-				var fragmentShader = createShader(glContext, glContext.FRAGMENT_SHADER, document.getElementById("frags1").text);
-				var program = createProgram(glContext, vertexShader, fragmentShader);
-				glContext.useProgram(program);
-				var attributes = {
-					position: glContext.getAttribLocation(program, "a_position"),
-					color: glContext.getAttribLocation(program, "a_color")
+			const bgCanvas = document.getElementById("bgcanvas");
+			const glBgContext = bgCanvas.getContext("webgl");
+			const fgCanvas = document.getElementById("iconcanvas");
+			const glFgContext = fgCanvas.getContext("webgl");
+			function drawBackground(colorInput) {
+				//.section PROGRAM.background
+				let backgroundVertexShader = createShader(glBgContext, glBgContext.VERTEX_SHADER, document.getElementById("shader-bg-v").text);
+				let backgroundFragmentShader = createShader(glBgContext, glBgContext.FRAGMENT_SHADER, document.getElementById("shader-bg-f").text);
+				let backgroundProgram = createProgram(glBgContext, backgroundVertexShader, backgroundFragmentShader);
+				glBgContext.useProgram(backgroundProgram);
+				let attributes = {
+					position: glBgContext.getAttribLocation(backgroundProgram, "a_position"),
+					color: glBgContext.getAttribLocation(backgroundProgram, "a_color")
 				};
 				//.section POSITION
-				const positions = [-1,1, 1,1, -1,-1, 1,-1];
-				const positionBuffer = glContext.createBuffer();
-				glContext.bindBuffer(glContext.ARRAY_BUFFER, positionBuffer);
-				glContext.enableVertexAttribArray(attributes.position);
-				glContext.bufferData(glContext.ARRAY_BUFFER, new Float32Array(positions), glContext.STATIC_DRAW);
-				glContext.vertexAttribPointer(attributes.position, 2, glContext.FLOAT, false, 0, 0);
+				const positions = [-1,1, 1,1, -1,-1, 1,-1, -1,-1, 1,1];
+				const positionBuffer = glBgContext.createBuffer();
+				glBgContext.bindBuffer(glBgContext.ARRAY_BUFFER, positionBuffer);
+				glBgContext.enableVertexAttribArray(attributes.position);
+				glBgContext.bufferData(glBgContext.ARRAY_BUFFER, new Float32Array(positions), glBgContext.STATIC_DRAW);
+				glBgContext.vertexAttribPointer(attributes.position, 2, glBgContext.FLOAT, false, 0, 0);
 				//.section COLOR
-				const colors = [1,0,0,1, 0,1,0,1, 0,0,1,1, 1,1,1,1];
-				const colorBuffer = glContext.createBuffer();
-				glContext.bindBuffer(glContext.ARRAY_BUFFER, colorBuffer);
-				glContext.enableVertexAttribArray(attributes.color);
-				glContext.bufferData(glContext.ARRAY_BUFFER, new Float32Array(colors), glContext.STATIC_DRAW);
-				glContext.vertexAttribPointer(attributes.color, 4, glContext.FLOAT, false, 0, 0);
-				//.section CLEAR
-				glContext.clearColor(0.1,0.1,0.4,1);
-				glContext.clear(glContext.COLOR_BUFFER_BIT);
+				const colorTemp = (Array.isArray(colorInput)) ? colorInput : [1,0,0,1, 0,1,0,1, 0,0,1,1, 1,1,1,1];
+				const colors = [...colorTemp, 
+					colorTemp[8], colorTemp[9], colorTemp[10], colorTemp[11], 
+					colorTemp[4], colorTemp[5], colorTemp[6], colorTemp[7]
+				];
+				const colorBuffer = glBgContext.createBuffer();
+				glBgContext.bindBuffer(glBgContext.ARRAY_BUFFER, colorBuffer);
+				glBgContext.enableVertexAttribArray(attributes.color);
+				glBgContext.bufferData(glBgContext.ARRAY_BUFFER, new Float32Array(colors), glBgContext.STATIC_DRAW);
+				glBgContext.vertexAttribPointer(attributes.color, 4, glBgContext.FLOAT, false, 0, 0);
 				//.section WRITE
-				glContext.drawArrays(glContext.TRIANGLE_STRIP, 0, 4);
+				glBgContext.drawArrays(glBgContext.TRIANGLES, 0, 6);
+				
+			}
+			if(glBgContext !== null) {
+				//.section CONFIGURATION
+				glBgContext.enable(glBgContext.DEPTH_TEST);
+				glFgContext.enable(glFgContext.DEPTH_TEST);
+				//.section CLEAR
+				glBgContext.clearColor(0.1,0.1,0.4,1);
+				glBgContext.clear(glBgContext.COLOR_BUFFER_BIT | glBgContext.DEPTH_BUFFER_BIT);
+				glFgContext.clear(glBgContext.COLOR_BUFFER_BIT | glBgContext.DEPTH_BUFFER_BIT);
+				drawBackground();
 			} else {
-				canvas.style.display = "none";
+				bgCanvas.style.display = "none";
+				fgCanvas.style.display = "none";
 			}
 			document.getElementById("showExtractedInputOption").onchange = function(e) {
 				document.getElementById("advanced").style.display = ((e.target.checked) ? "block" : "none");
 			}
-			//todo: Model rendering, animation parsing, animation tweening
+			//todo: Texture parsing, Animation parsing, animation tweening
 		</script>
-		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> - &copy; 2023 yellows111</span>
+		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] - &copy; 2023 yellows111</span>
 		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>
+		<script>document.getElementById("clientVersion").textContent = "0.4.3";</script>
 	</body>
 </html>
