@@ -2,9 +2,9 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8"></meta>
-		<meta name="viewport" content="initial-scale=2.0"></meta>
+		<meta name="viewport" content="initial-scale=1.5"></meta>
 		<meta name="description" content="A HTML client for icondumper2"></meta>
-		<title>input validation test</title>
+		<title>icondumper2 - HTML reference client</title>
 		<script src="icon.js"></script>
 		<style>
 			html {color: #ccc; background: black; font-family: sans-serif}
@@ -26,16 +26,24 @@
 			attribute vec3 a_normal;
 			attribute vec2 a_textureCoords;
 			attribute vec4 a_color;
+
+			uniform float u_rotation;
+			uniform highp vec3 u_ambientLight;
+			//uniform highp vec3 u_lightColorA;
+			//uniform highp vec3 u_lightColorB;
+			//uniform highp vec3 u_lightColorC;
 			
 			varying lowp vec4 v_color;
 			varying lowp vec2 v_textureCoords;
-			
-			void main() {
+
+			void main() {	
+				float angle = radians(360.0) * u_rotation;
+				vec2 pos = vec2(cos(angle), sin(angle));
 				// x, y, z, scale (w)
 				gl_Position = vec4(
-					a_position.x,
+					(a_position.x * pos.x) + (a_position.z * pos.y), //transform the x position
 					(0.0 - a_position.y) - 2.75, // invert the y position and move down -2.75, which will center the model
-					a_position.z,
+					(a_position.x * -pos.y) + (a_position.z * pos.x), //transform the z position
 					3.0
 				);
 				// flip it, scale it
@@ -46,16 +54,23 @@
 		<script type="text/plain" id="shader-icon-f">
 			varying lowp vec4 v_color;
 
+			uniform highp vec3 u_ambientLight;
+
 			void main() {
-				gl_FragColor = v_color;
+				highp vec3 ambientColor = (u_ambientLight * vec3(v_color));
+				gl_FragColor = vec4(ambientColor, v_color.a);
 			}
 		</script>
 		<script type="text/plain" id="shader-icon-f2">
 			varying lowp vec2 v_textureCoords;
+
 			uniform sampler2D u_sampler;
+			uniform highp vec3 u_ambientLight;
 
 			void main() {
-				gl_FragColor = texture2D(u_sampler, v_textureCoords);
+				mediump vec4 texture = texture2D(u_sampler, v_textureCoords);
+				highp vec3 ambientColor = (u_ambientLight * vec3(texture));
+				gl_FragColor = vec4(ambientColor, texture.a);
 			}
 		</script>
 		<meta data-comment="WebGL Shader: Background">
@@ -72,7 +87,7 @@
 			}
 		</script>
 		<script type="text/plain" id="shader-bg-f">
-			precision mediump float;
+			precision lowp float;
 			varying lowp vec4 vColor;
 
 			void main() {
@@ -124,6 +139,27 @@
 			<span>File comments: </span><span id="fileCommentGame">(no title)</span></span><span> - </span><span id="fileCommentName">(no description)</span>
 		</p>
 		<script>
+			const rotationDensity = 60;
+			rotations = 2;
+			document.body.onkeydown = function(ev) {
+				if(glBgContext === null) {return;}
+					if(typeof URotation !== "undefined") {
+					switch(ev.code) {
+						case "ArrowLeft": {
+							rotations--;
+							if(rotations < -rotationDensity) {rotations = -1;}
+							break;
+						}
+						case "ArrowRight": {
+							rotations++;
+							if(rotations > rotationDensity) {rotations = 1;}
+							break;
+						}
+					};
+					glFgContext.uniform1f(URotation, (rotations/rotationDensity));
+					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, ULength);
+				} else {return;}
+			}
 			// I usually don't do in-body <script>'s, but I didn't want to do an await onload again
 			function updateDisplay(input) {
 				document.getElementById("title1").textContent = input.title[0];
@@ -165,7 +201,21 @@
 				document.getElementById("fileCommentGame").textContent = "(no title)";
 				document.getElementById("fileCommentName").textContent = "(no description)";
 			}
-			function renderIcon(iconData) {
+			function renderIcon(iconData, fileMetadata = null) {
+				console.log("rats", fileMetadata);
+				if(fileMetadata === null) {
+					fileMetadata = {
+						"lighting": {
+							"points": [{x:0,y:0,z:0},{x:0,y:0,z:0},{x:0,y:0,z:0}],
+							"colors": [
+								{r:1,g:1,b:1,a:1}, //ambient
+								{r:1,g:0,b:0,a:1}, //p[0]
+								{r:0,g:1,b:0,a:1}, //p[1]
+								{r:0,g:0,b:1,a:1}  //p[2]
+							]
+						}
+					};
+				}
 				if(glFgContext === null) {return -1;} else {
 					const texture = glFgContext.createTexture();
 					glFgContext.bindTexture(glFgContext.TEXTURE_2D, texture);
@@ -188,7 +238,7 @@
 						var iconVertexShader = createShader(glFgContext, glFgContext.VERTEX_SHADER, document.getElementById("shader-icon-v").text);
 						var iconFragmentShader = createShader(glFgContext, glFgContext.FRAGMENT_SHADER, document.getElementById("shader-icon-f").text);
 					}
-					var iconProgram = createProgram(glFgContext, iconVertexShader, iconFragmentShader);
+					let iconProgram = createProgram(glFgContext, iconVertexShader, iconFragmentShader);
 					glFgContext.useProgram(iconProgram);
 					if(iconData.textureFormat !== "N") {
 						var attributes = {
@@ -196,13 +246,19 @@
 							textureCoords: glFgContext.getAttribLocation(iconProgram, "a_textureCoords")
 						};
 						var uniforms = {
-							sampler: glFgContext.getUniformLocation(iconProgram, "u_sampler")
+							rotation: glFgContext.getUniformLocation(iconProgram, "u_rotation"),
+							ambientLighting: glFgContext.getUniformLocation(iconProgram, "u_ambientLight")
 						}
 					} else {
 						var attributes = {
 							position: glFgContext.getAttribLocation(iconProgram, "a_position"),
-							color: glFgContext.getAttribLocation(iconProgram, "a_color")
+							color: glFgContext.getAttribLocation(iconProgram, "a_color"),
 						};
+						var uniforms = {
+							sampler: glFgContext.getUniformLocation(iconProgram, "u_sampler"),
+							rotation: glFgContext.getUniformLocation(iconProgram, "u_rotation"),
+							ambientLighting: glFgContext.getUniformLocation(iconProgram, "u_ambientLight")
+						}
 					}
 					//.section SETUP
 					let verticesArray = new Array();
@@ -215,7 +271,7 @@
 						colourArray.push(vertexObject.color.r/255);
 						colourArray.push(vertexObject.color.g/255);
 						colourArray.push(vertexObject.color.b/255);
-						colourArray.push(vertexObject.color.a/255);
+						colourArray.push((vertexObject.color.a > 1) ? (vertexObject.color.a/255): 1);
 						uvArray.push(vertexObject.uv.u);
 						uvArray.push(vertexObject.uv.v);
 					});
@@ -244,8 +300,22 @@
 						glFgContext.bindTexture(glFgContext.TEXTURE_2D, texture);
 						glFgContext.uniform1i(uniforms.sampler, 0);
 					}
+					//.section ROTATE
+					// sets the angle uniform to 2/rotationDensity, this puts the icon at an angle.
+					// globalize uniform rotation
+					URotation = uniforms.rotation;
+					rotations = 2;
+					glFgContext.uniform1f(URotation, rotations/rotationDensity);
+
+					//.section LIGHTING
+					let colours = fileMetadata.lighting.colors[0];
+					//glFgContext.uniform3f(uniforms.ambientLighting, colours.r, colours.g, colours.b);
+					glFgContext.uniform3f(uniforms.ambientLighting, 1, 1, 1);
+
 					//.section WRITE
-					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, (verticesArray.length/3));
+					//globalize count of triangles, as well
+					ULength = (verticesArray.length/3);
+					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, ULength);
 				}
 			}
 			document.getElementById("strictnessOption").onchange = function(e) {
@@ -304,7 +374,7 @@
 						Object.keys(output.filenames).forEach(function(file) {
 							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
 						});
-						renderIcon(output2.n);
+						renderIcon(output2.n, output);
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
@@ -329,7 +399,7 @@
 						let inputData = readPsvFile(d);
 						let output = readPS2D(inputData["icon.sys"]);
 						updateDisplay(output);
-						renderIcon(readIconFile(inputData.icons.n));
+						renderIcon(readIconFile(inputData.icons.n), output);
 						let cTime = inputData.timestamps.created;
 						let mTime = inputData.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
@@ -357,7 +427,7 @@
 						Object.keys(output.filenames).forEach(function(file) {
 							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
 						});
-						renderIcon(output2.n);
+						renderIcon(output2.n, output);
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
@@ -374,23 +444,23 @@
 				});
 			}
 			function createShader(gl, type, source) {
-				var shader = gl.createShader(type);
+				let shader = gl.createShader(type);
 				gl.shaderSource(shader, source);
 				gl.compileShader(shader);
-				var success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+				let success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
 				if (success) {
 					return shader;
 				}
 
-				console.log(gl.getShaderInfoLog(shader));
+				console.log(gl.getShaderInfoLog(shader), source);
 				gl.deleteShader(shader);
 			}
 			function createProgram(gl, vertexShader, fragmentShader) {
-				var program = gl.createProgram();
+				let program = gl.createProgram();
 				gl.attachShader(program, vertexShader);
 				gl.attachShader(program, fragmentShader);
 				gl.linkProgram(program);
-				var success = gl.getProgramParameter(program, gl.LINK_STATUS);
+				let success = gl.getProgramParameter(program, gl.LINK_STATUS);
 				if (success) {
 					return program;
 				}
@@ -413,25 +483,21 @@
 					color: glBgContext.getAttribLocation(backgroundProgram, "a_color")
 				};
 				//.section POSITION
-				const positions = [-1,1, 1,1, -1,-1, 1,-1, -1,-1, 1,1];
+				const positions = [-1,1, 1,1, -1,-1, 1,-1];
 				const positionBuffer = glBgContext.createBuffer();
 				glBgContext.bindBuffer(glBgContext.ARRAY_BUFFER, positionBuffer);
 				glBgContext.enableVertexAttribArray(attributes.position);
 				glBgContext.bufferData(glBgContext.ARRAY_BUFFER, new Float32Array(positions), glBgContext.STATIC_DRAW);
 				glBgContext.vertexAttribPointer(attributes.position, 2, glBgContext.FLOAT, false, 0, 0);
 				//.section COLOR
-				const colorTemp = (Array.isArray(colorInput)) ? colorInput : [1,0,0,1, 0,1,0,1, 0,0,1,1, 1,1,1,1];
-				const colors = [...colorTemp, 
-					colorTemp[8], colorTemp[9], colorTemp[10], colorTemp[11], 
-					colorTemp[4], colorTemp[5], colorTemp[6], colorTemp[7]
-				];
+				const colors = (Array.isArray(colorInput)) ? colorInput : [1,0,0,1, 0,1,0,1, 0,0,1,1, 1,1,1,1];
 				const colorBuffer = glBgContext.createBuffer();
 				glBgContext.bindBuffer(glBgContext.ARRAY_BUFFER, colorBuffer);
 				glBgContext.enableVertexAttribArray(attributes.color);
 				glBgContext.bufferData(glBgContext.ARRAY_BUFFER, new Float32Array(colors), glBgContext.STATIC_DRAW);
 				glBgContext.vertexAttribPointer(attributes.color, 4, glBgContext.FLOAT, false, 0, 0);
 				//.section WRITE
-				glBgContext.drawArrays(glBgContext.TRIANGLES, 0, 6);
+				glBgContext.drawArrays(glBgContext.TRIANGLE_STRIP, 0, 4);
 				
 			}
 			if(glBgContext !== null) {
@@ -441,7 +507,7 @@
 				//.section CLEAR
 				glBgContext.clearColor(0.1,0.1,0.4,1);
 				glBgContext.clear(glBgContext.COLOR_BUFFER_BIT | glBgContext.DEPTH_BUFFER_BIT);
-				glFgContext.clear(glBgContext.COLOR_BUFFER_BIT | glBgContext.DEPTH_BUFFER_BIT);
+				glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);
 				drawBackground();
 			} else {
 				bgCanvas.style.display = "none";
@@ -452,8 +518,8 @@
 			}
 			//todo: Animation parsing, animation tweening
 		</script>
-		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] - &copy; 2023 yellows111</span>
+		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; 2023 yellows111</span>
 		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>
-		<script>document.getElementById("clientVersion").textContent = "0.5.2";</script>
+		<script>document.getElementById("clientVersion").textContent = "0.6.1";</script>
 	</body>
 </html>

@@ -161,8 +161,8 @@ function readIconFile(input) {
 		r: (i & 0xff), 
 		g: ((i & 0xff00) >> 8), 
 		b: ((i & 0xff0000) >> 16), 
-		//a: (i > 0x7fffffff ? 255 : (((i & 0xff000000) >>> 24) * 2)+1)
-		a: 255 // I don't think alpha transparency is actually USED in icons?
+		a: (i > 0x7fffffff ? 255 : (((i & 0xff000000) >>> 24) * 2)+1)
+		// I don't think alpha transparency is actually USED in icons?, rendering with it looks strange.
 	}};
 	const magic = u32le(0);
 	if (magic !== 0x010000) {
