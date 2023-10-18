@@ -1,7 +1,7 @@
 //todo: Make this a module/mjs file. C6 compatibility can stay, if needed.
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
-ICONJS_VERSION = "0.4.0";
+ICONJS_VERSION = "0.4.1";
 
 function setDebug(value) {
 	ICONJS_DEBUG = !!value;
@@ -27,7 +27,7 @@ function getTextureFormat(i) {
 }
 
 function uncompressTexture(texData) {
-	// for texture formats 8-14 (and maybe 15 but that's being weird)
+	// for texture formats 8-15
 	if (texData.length & 1) {
 		throw "Texture size isn't a multiple of 2 (was ${texData.length})";
 	}
@@ -35,7 +35,7 @@ function uncompressTexture(texData) {
 	const u16le = function(i){return view.getUint16(i, 1)}
 	let uncompressed = new Uint16Array(16384);
 	let offset = 0;
-	for (let index = 0; index < 16384; index++) {
+	for (let index = 0; index < 16384;) {
 		currentValue = u16le(offset);
 		if(currentValue === 0) {
 			// if this is specifically a katamari 1 or 2 icon, skip this byte
@@ -45,7 +45,7 @@ function uncompressTexture(texData) {
 		}
 		offset += 2;
 		if (currentValue >= 0xff00) {
-			//do a raw copy
+			//do a raw copy of the next currentValue bytes
 			let length = ((0x10000 - currentValue));
 			for (let enumerator = 0; enumerator < length; enumerator++) {
 				uncompressed[index] = u16le(offset);
@@ -53,7 +53,7 @@ function uncompressTexture(texData) {
 				index++;
 			}
 		} else {
-			//repeat next byte rleType times
+			//repeat next byte currentValue times
 			uncompressed[index] = u16le(offset);
 			for (let indey = 0; indey < currentValue; indey++) {
 				uncompressed[index] = u16le(offset);
@@ -61,7 +61,6 @@ function uncompressTexture(texData) {
 			}
 			offset += 2;
 		}
-		index--;
 	}
 	return uncompressed;
 }
@@ -71,13 +70,11 @@ function convertBGR5A1toRGB5A1(bgrData) {
 		throw `Not a 128x128x16 texture. (length was ${bgrData.length})`;
 	}
 	// converts 5-bit blue, green, red (in that order) with one alpha bit to GL-compatible RGB5A1
-	const view = new DataView(bgrData);
-	const u16le = function(i){return view.getUint16(i, 1)}
 	let converted = new Uint16Array(16384);
 	for (let index = 0; index < 16384; index++) {
-		let b = (  u16le(index*2)          & 0b11111);
-		let g = (((u16le(index*2)) >>  5) & 0b11111);
-		let r = (((u16le(index*2)) >> 10) & 0b11111);
+		let b = ( bgrData[index]         & 0b11111);
+		let g = ((bgrData[index] >>  5) & 0b11111);
+		let r = ((bgrData[index] >> 10) & 0b11111);
 		//               rrrrrgggggbbbbba (a = 1 because 0 is 127 which is 1.0f opacity for the GS)
 		let newValue = 0b0000000000000001;
 		newValue |= (r << 1);

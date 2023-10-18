@@ -173,9 +173,9 @@
 						let rgb5a1_converted;
 						if (iconData.textureFormat === "C") {
 							let uncompressed = uncompressTexture(iconData.texture.data);
-							rgb5a1_converted = convertBGR5A1toRGB5A1(uncompressed.buffer);
+							rgb5a1_converted = convertBGR5A1toRGB5A1(uncompressed);
 						} else {
-							rgb5a1_converted = convertBGR5A1toRGB5A1(iconData.texture.buffer);
+							rgb5a1_converted = convertBGR5A1toRGB5A1(iconData.texture);
 						}
 						glFgContext.texImage2D(glFgContext.TEXTURE_2D, 0, glFgContext.RGBA, 128, 128, 0, glFgContext.RGBA, glFgContext.UNSIGNED_SHORT_5_5_5_1, rgb5a1_converted);
 						glFgContext.generateMipmap(glFgContext.TEXTURE_2D);
@@ -454,6 +454,6 @@
 		</script>
 		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] - &copy; 2023 yellows111</span>
 		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>
-		<script>document.getElementById("clientVersion").textContent = "0.5.1";</script>
+		<script>document.getElementById("clientVersion").textContent = "0.5.2";</script>
 	</body>
 </html>

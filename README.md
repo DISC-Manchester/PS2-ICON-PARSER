@@ -15,6 +15,7 @@ A JavaScript library (sorta) to read PS2 icons, and their related formats.
 * Read and parse an EMS MA export file.
 * Export the icon model, with all seperate shapes included to a JavaScript Object.
 * Node.js compatible (CommonJS) exporting while still being compatible with other JavaScript implementations.
+* Convert a 128x128x16 BGR5A1 bitmap to a RGB5A1 format.
 
 ## What it doesn't do
 * (Re)build save files.
