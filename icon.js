@@ -1,7 +1,7 @@
 //todo: Make this a module/mjs file. C6 compatibility can stay, if needed.
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
-ICONJS_VERSION = "0.4.1";
+ICONJS_VERSION = "0.4.2";
 
 function setDebug(value) {
 	ICONJS_DEBUG = !!value;

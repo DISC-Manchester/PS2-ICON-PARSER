@@ -44,7 +44,7 @@
 					(a_position.x * pos.x) + (a_position.z * pos.y), //transform the x position
 					(0.0 - a_position.y) - 2.75, // invert the y position and move down -2.75, which will center the model
 					(a_position.x * -pos.y) + (a_position.z * pos.x), //transform the z position
-					3.0
+					3.5
 				);
 				// flip it, scale it
 				v_textureCoords = a_textureCoords;
@@ -63,14 +63,21 @@
 		</script>
 		<script type="text/plain" id="shader-icon-f2">
 			varying lowp vec2 v_textureCoords;
+			varying lowp vec4 v_color;
 
 			uniform sampler2D u_sampler;
 			uniform highp vec3 u_ambientLight;
 
 			void main() {
-				mediump vec4 texture = texture2D(u_sampler, v_textureCoords);
-				highp vec3 ambientColor = (u_ambientLight * vec3(texture));
-				gl_FragColor = vec4(ambientColor, texture.a);
+				mediump vec4 texture_c = texture2D(u_sampler, v_textureCoords);
+				highp vec3 ambientColorT = (u_ambientLight * vec3(texture_c));
+				highp vec3 ambientColorV = (u_ambientLight * vec3(v_color));
+				//This has issues with oversaturation, but it means blended icons work.
+				if(v_color == vec4(1.0,1.0,1.0,1.0)) {
+					gl_FragColor = vec4((ambientColorT * ambientColorV), texture_c.a);
+				} else {
+					gl_FragColor = vec4((ambientColorT * ambientColorV) * 2.0, texture_c.a);
+				}
 			}
 		</script>
 		<meta data-comment="WebGL Shader: Background">
@@ -106,11 +113,11 @@
 			<h1 id="title1">&#xFF2E;&#xFF4F;&#x3000;&#xFF26;&#xFF49;&#xFF4C;&#xFF45;</h1> 
 			<h1 id="title2">&#xFF2C;&#xFF4F;&#xFF41;&#xFF44;&#xFF45;&#xFF44;</h1>
 		</div>
-		<span>Background/icon preview:</span><br>
+		<span>Background/icon preview (rotate: &larr;/&rarr; keys):</span><br>
 		<canvas id="bgcanvas" width="360" height="360"></canvas>
 		<canvas id="iconcanvas" width="360" height="360"></canvas>
 		<hr>
-		<p>Normal: <kbd id="iconn">(no file)</kbd> Copying: <kbd id="iconc">(no file)</kbd> Deleting: <kbd id="icond">(no file)</kbd></p>
+		<p>Normal: <kbd id="iconn">(no&nbsp;file)<wbr></kbd> Copying: <kbd id="iconc">(no&nbsp;file)<wbr></kbd> Deleting: <kbd id="icond">(no&nbsp;file)</kbd></p>
 		<div id="advanced">
 			<hr>
 			<label for="input">icon.sys goes here:</label>
@@ -131,9 +138,9 @@
 		<input type="file" id="spsinput" name="spsinput" accept=".sps, .xps" />
 		<br>
 		<p>
-			<span>Date created: </span><span id="dateCreated">--:--:-- --/--/----</span><span> UTC+09:00</span>
-			<span> | </span>
-			<span>Date modified: </span><span id="dateModified">--:--:-- --/--/----</span><span> UTC+09:00</span>
+			<span>Date&nbsp;created: </span><span id="dateCreated">--:--:--&nbsp;--/--/----</span><span> UTC+09:00</span>
+			<wbr><span>&ndash;</span>
+			<span>Date&nbsp;modified: </span><span id="dateModified">--:--:--&nbsp;--/--/----</span><span> UTC+09:00</span>
 		</p>
 		<p>
 			<span>File comments: </span><span id="fileCommentGame">(no title)</span></span><span> - </span><span id="fileCommentName">(no description)</span>
@@ -202,7 +209,6 @@
 				document.getElementById("fileCommentName").textContent = "(no description)";
 			}
 			function renderIcon(iconData, fileMetadata = null) {
-				console.log("rats", fileMetadata);
 				if(fileMetadata === null) {
 					fileMetadata = {
 						"lighting": {
@@ -243,7 +249,8 @@
 					if(iconData.textureFormat !== "N") {
 						var attributes = {
 							position: glFgContext.getAttribLocation(iconProgram, "a_position"),
-							textureCoords: glFgContext.getAttribLocation(iconProgram, "a_textureCoords")
+							textureCoords: glFgContext.getAttribLocation(iconProgram, "a_textureCoords"),
+							color: glFgContext.getAttribLocation(iconProgram, "a_color"),
 						};
 						var uniforms = {
 							rotation: glFgContext.getUniformLocation(iconProgram, "u_rotation"),
@@ -281,14 +288,13 @@
 					glFgContext.enableVertexAttribArray(attributes.position);
 					glFgContext.bufferData(glFgContext.ARRAY_BUFFER, new Float32Array(verticesArray), glFgContext.STATIC_DRAW);
 					glFgContext.vertexAttribPointer(attributes.position, 3, glFgContext.FLOAT, false, 0, 0);
-					if(iconData.textureFormat === "N") {
-						//.section COLOURS
-						const colorBuffer = glFgContext.createBuffer();
-						glFgContext.bindBuffer(glFgContext.ARRAY_BUFFER, colorBuffer);
-						glFgContext.enableVertexAttribArray(attributes.color);
-						glFgContext.bufferData(glFgContext.ARRAY_BUFFER, new Float32Array(colourArray), glFgContext.STATIC_DRAW);
-						glFgContext.vertexAttribPointer(attributes.color, 4, glFgContext.FLOAT, false, 0, 0);
-					} else {
+					//.section COLOURS
+					const colorBuffer = glFgContext.createBuffer();
+					glFgContext.bindBuffer(glFgContext.ARRAY_BUFFER, colorBuffer);
+					glFgContext.enableVertexAttribArray(attributes.color);
+					glFgContext.bufferData(glFgContext.ARRAY_BUFFER, new Float32Array(colourArray), glFgContext.STATIC_DRAW);
+					glFgContext.vertexAttribPointer(attributes.color, 4, glFgContext.FLOAT, false, 0, 0);
+					if(iconData.textureFormat !== "N") {
 						//.section UV
 						const uvBuffer = glFgContext.createBuffer();
 						glFgContext.bindBuffer(glFgContext.ARRAY_BUFFER, uvBuffer);
@@ -400,6 +406,7 @@
 						let output = readPS2D(inputData["icon.sys"]);
 						updateDisplay(output);
 						renderIcon(readIconFile(inputData.icons.n), output);
+						console.log(readIconFile(inputData.icons.n));
 						let cTime = inputData.timestamps.created;
 						let mTime = inputData.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
@@ -520,6 +527,6 @@
 		</script>
 		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; 2023 yellows111</span>
 		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>
-		<script>document.getElementById("clientVersion").textContent = "0.6.1";</script>
+		<script>document.getElementById("clientVersion").textContent = "0.6.2";</script>
 	</body>
 </html>
