@@ -28,6 +28,7 @@
 			attribute vec4 a_color;
 
 			uniform float u_rotation;
+			uniform float u_scale;
 			uniform highp vec3 u_ambientLight;
 			//uniform highp vec3 u_lightColorA;
 			//uniform highp vec3 u_lightColorB;
@@ -44,7 +45,7 @@
 					(a_position.x * pos.x) + (a_position.z * pos.y), //transform the x position
 					(0.0 - a_position.y) - 2.75, // invert the y position and move down -2.75, which will center the model
 					(a_position.x * -pos.y) + (a_position.z * pos.x), //transform the z position
-					3.5
+					u_scale
 				);
 				// flip it, scale it
 				v_textureCoords = a_textureCoords;
@@ -72,10 +73,13 @@
 				mediump vec4 texture_c = texture2D(u_sampler, v_textureCoords);
 				highp vec3 ambientColorT = (u_ambientLight * vec3(texture_c));
 				highp vec3 ambientColorV = (u_ambientLight * vec3(v_color));
-				//This has issues with oversaturation, but it means blended icons work.
+				//This has issues with oversaturation (JXCR), but it means blended icons work.
+				//This also makes scaling a bit strange (JXCR, WLK). Why does it change depending on the scale?
 				if(v_color == vec4(1.0,1.0,1.0,1.0)) {
 					gl_FragColor = vec4((ambientColorT * ambientColorV), texture_c.a);
 				} else {
+					//WLK *SHOULD* follow this path, but doesn't. What can I do to fix this?
+					//Removing this path makes the models very dark, doing this fixes it, with oversaturation on false positives.
 					gl_FragColor = vec4((ambientColorT * ambientColorV) * 2.0, texture_c.a);
 				}
 			}
@@ -113,9 +117,9 @@
 			<h1 id="title1">&#xFF2E;&#xFF4F;&#x3000;&#xFF26;&#xFF49;&#xFF4C;&#xFF45;</h1> 
 			<h1 id="title2">&#xFF2C;&#xFF4F;&#xFF41;&#xFF44;&#xFF45;&#xFF44;</h1>
 		</div>
-		<span>Background/icon preview (rotate: &larr;/&rarr; keys):</span><br>
-		<canvas id="bgcanvas" width="360" height="360"></canvas>
-		<canvas id="iconcanvas" width="360" height="360"></canvas>
+		<span>Background/icon preview (rotate: &larr;/&rarr; keys, scale: &uarr;/&darr; keys):</span><br>
+		<canvas id="bgcanvas" width="480" height="480"></canvas>
+		<canvas id="iconcanvas" width="480" height="480"></canvas>
 		<hr>
 		<p>Normal: <kbd id="iconn">(no&nbsp;file)<wbr></kbd> Copying: <kbd id="iconc">(no&nbsp;file)<wbr></kbd> Deleting: <kbd id="icond">(no&nbsp;file)</kbd></p>
 		<div id="advanced">
@@ -146,28 +150,52 @@
 			<span>File comments: </span><span id="fileCommentGame">(no title)</span></span><span> - </span><span id="fileCommentName">(no description)</span>
 		</p>
 		<script>
+			// I usually don't do in-body <script>'s, but I didn't want to do an await onload() again
+			const GlobalState = {rotations: 2, dataLength: 0, uniforms: {rotation: null, scale: null}};
+			// I don't care HOW disgusting doing this is, I'm sick of pressing escape to clear these.
+			let allInputs = document.querySelectorAll('input[type="file"]');
+			allInputs.forEach(
+				function(nodeObject) {
+					nodeObject.onclick = function() {
+						allInputs.forEach(function(elementObject) {elementObject.value = null;});
+					}
+				}
+			);
+			// rotation stuff
 			const rotationDensity = 60;
-			rotations = 2;
 			document.body.onkeydown = function(ev) {
 				if(glBgContext === null) {return;}
-					if(typeof URotation !== "undefined") {
+					if(typeof GlobalState.uniforms.rotation !== "undefined") {
 					switch(ev.code) {
 						case "ArrowLeft": {
-							rotations--;
-							if(rotations < -rotationDensity) {rotations = -1;}
+							GlobalState.rotations--;
+							if(GlobalState.rotations < -rotationDensity) {GlobalState.rotations = -1;}
 							break;
 						}
 						case "ArrowRight": {
-							rotations++;
-							if(rotations > rotationDensity) {rotations = 1;}
+							GlobalState.rotations++;
+							if(GlobalState.rotations > rotationDensity) {GlobalState.rotations = 1;}
 							break;
 						}
+						case "ArrowUp": {
+							GlobalState.scale -= 0.1;
+							if(GlobalState.scale <= 2) {GlobalState.scale = 2.0;}
+							break;
+						}
+						case "ArrowDown": {
+							GlobalState.scale += 0.1;
+							if(GlobalState.scale >= 6.0) {GlobalState.scale = 6.0;}
+							break;
+						}
+						default: {
+							return;
+						}
 					};
-					glFgContext.uniform1f(URotation, (rotations/rotationDensity));
-					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, ULength);
+					glFgContext.uniform1f(GlobalState.uniforms.scale, GlobalState.scale);
+					glFgContext.uniform1f(GlobalState.uniforms.rotation, (GlobalState.rotations/rotationDensity));
+					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, GlobalState.dataLength);
 				} else {return;}
 			}
-			// I usually don't do in-body <script>'s, but I didn't want to do an await onload again
 			function updateDisplay(input) {
 				document.getElementById("title1").textContent = input.title[0];
 				document.getElementById("title2").textContent = input.title[1];
@@ -254,7 +282,8 @@
 						};
 						var uniforms = {
 							rotation: glFgContext.getUniformLocation(iconProgram, "u_rotation"),
-							ambientLighting: glFgContext.getUniformLocation(iconProgram, "u_ambientLight")
+							ambientLighting: glFgContext.getUniformLocation(iconProgram, "u_ambientLight"),
+							scale: glFgContext.getUniformLocation(iconProgram, "u_scale")
 						}
 					} else {
 						var attributes = {
@@ -264,7 +293,8 @@
 						var uniforms = {
 							sampler: glFgContext.getUniformLocation(iconProgram, "u_sampler"),
 							rotation: glFgContext.getUniformLocation(iconProgram, "u_rotation"),
-							ambientLighting: glFgContext.getUniformLocation(iconProgram, "u_ambientLight")
+							ambientLighting: glFgContext.getUniformLocation(iconProgram, "u_ambientLight"),
+							scale: glFgContext.getUniformLocation(iconProgram, "u_scale")
 						}
 					}
 					//.section SETUP
@@ -309,19 +339,24 @@
 					//.section ROTATE
 					// sets the angle uniform to 2/rotationDensity, this puts the icon at an angle.
 					// globalize uniform rotation
-					URotation = uniforms.rotation;
-					rotations = 2;
-					glFgContext.uniform1f(URotation, rotations/rotationDensity);
+					GlobalState.uniforms.rotation = uniforms.rotation;
+					GlobalState.rotations = 2;
+					glFgContext.uniform1f(GlobalState.uniforms.rotation, GlobalState.rotations/rotationDensity);
 
 					//.section LIGHTING
 					let colours = fileMetadata.lighting.colors[0];
 					//glFgContext.uniform3f(uniforms.ambientLighting, colours.r, colours.g, colours.b);
 					glFgContext.uniform3f(uniforms.ambientLighting, 1, 1, 1);
 
+					//.section SCALING
+					GlobalState.uniforms.scale = uniforms.scale;
+					GlobalState.scale = 3.5;
+					glFgContext.uniform1f(GlobalState.uniforms.scale, GlobalState.scale);
+
 					//.section WRITE
 					//globalize count of triangles, as well
-					ULength = (verticesArray.length/3);
-					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, ULength);
+					GlobalState.dataLength = (verticesArray.length/3);
+					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, GlobalState.dataLength);
 				}
 			}
 			document.getElementById("strictnessOption").onchange = function(e) {
@@ -358,7 +393,7 @@
 					try {
 						let output = readIconFile(d);
 						renderIcon(output);
-						console.log("model data",output);
+						console.log("model data (ic*)",output);
 					} catch(e) {
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
 						alert(e);
@@ -386,7 +421,8 @@
 						//TODO: use Time() to align JST times to user-local timezone
 						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
-						console.log("model files", output2);
+						console.log("model files (psu)", output2);
+						console.log("icon.sys (psu)", output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
@@ -405,13 +441,19 @@
 						let inputData = readPsvFile(d);
 						let output = readPS2D(inputData["icon.sys"]);
 						updateDisplay(output);
-						renderIcon(readIconFile(inputData.icons.n), output);
-						console.log(readIconFile(inputData.icons.n));
+						const icons = {
+							n: readIconFile(inputData.icons.n),
+							c: readIconFile(inputData.icons.c),
+							d: readIconFile(inputData.icons.d),
+						}
+						renderIcon(icons.n, output);
 						let cTime = inputData.timestamps.created;
 						let mTime = inputData.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
 						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
+						console.log("model files (psv)", icons);
+						console.log("icon.sys (psv)", output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
@@ -442,7 +484,8 @@
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
 						document.getElementById("fileCommentGame").textContent = vFilesystem.comments.game;
 						document.getElementById("fileCommentName").textContent = vFilesystem.comments.name;
-						console.log("model files", output2);
+						console.log("model files (*ps)", output2);
+						console.log("icon.sys (*ps)", output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
@@ -459,7 +502,7 @@
 					return shader;
 				}
 
-				console.log(gl.getShaderInfoLog(shader), source);
+				console.log(gl.getShaderInfoLog(shader), (new String().padStart(60, "-")), source);
 				gl.deleteShader(shader);
 			}
 			function createProgram(gl, vertexShader, fragmentShader) {
@@ -509,7 +552,6 @@
 			}
 			if(glBgContext !== null) {
 				//.section CONFIGURATION
-				glBgContext.enable(glBgContext.DEPTH_TEST);
 				glFgContext.enable(glFgContext.DEPTH_TEST);
 				//.section CLEAR
 				glBgContext.clearColor(0.1,0.1,0.4,1);
@@ -523,10 +565,10 @@
 			document.getElementById("showExtractedInputOption").onchange = function(e) {
 				document.getElementById("advanced").style.display = ((e.target.checked) ? "block" : "none");
 			}
-			//todo: Animation parsing, animation tweening
+			//todo: More than one model shape rendering, other 2 icons, Animation parsing, animation tweening
 		</script>
 		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; 2023 yellows111</span>
 		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>
-		<script>document.getElementById("clientVersion").textContent = "0.6.2";</script>
+		<script>document.getElementById("clientVersion").textContent = "0.6.3";</script>
 	</body>
 </html>

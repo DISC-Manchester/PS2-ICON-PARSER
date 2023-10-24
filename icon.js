@@ -1,7 +1,8 @@
 //todo: Make this a module/mjs file. C6 compatibility can stay, if needed.
+//LOOKING FOR: LZARI implementation (for MAX), description of CBS compression (node zlib doesn't tackle it, even with RC4'ing the data)
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
-ICONJS_VERSION = "0.4.2";
+ICONJS_VERSION = "0.5.0";
 
 function setDebug(value) {
 	ICONJS_DEBUG = !!value;
@@ -77,6 +78,7 @@ function convertBGR5A1toRGB5A1(bgrData) {
 		let r = ((bgrData[index] >> 10) & 0b11111);
 		//               rrrrrgggggbbbbba (a = 1 because 0 is 127 which is 1.0f opacity for the GS)
 		let newValue = 0b0000000000000001;
+		// mind you, the alpha bit      ^ seems to be set randomly on textures, anyway. Maybe i'm reading these wrong?
 		newValue |= (r << 1);
 		newValue |= (g << 6);
 		newValue |= (b << 11);
@@ -166,7 +168,8 @@ function readIconFile(input) {
 	}};
 	const magic = u32le(0);
 	if (magic !== 0x010000) {
-		// USER WARNING: APPARENTLY NOT ALL ICONS ARE 0x010000. THIS THROW WILL BE DROPPED LATER.
+		// USER NOTICE: So far, I have yet to parse an icon that hasn't had 0x00010000 as it's magic.
+		//              Can someone provide me pointers to such an icon if one exists?
 		throw `Not a PS2 icon file (was ${magic}, expected ${0x010000})`;
 	}
 	const numberOfShapes = u32le(4);
@@ -237,6 +240,7 @@ function readIconFile(input) {
 		case 'U': {
 			//where every 16-bit entry is a BGR5A1 color 0b[bbbbbgggggrrrrra]
 			texture = new Uint16Array(input.slice(offset, (offset+0x8000)));
+			//see convertBGR5A1toRGB5A1() for more info.
 			break;
 		}
 		case 'C': {
@@ -257,6 +261,7 @@ function readIconFile(input) {
 			**/
 			//output of this will be another u16[0x4000] of the decompressed texture
 			//after that just parse output as-if it was uncompressed.
+			//see uncompressTexture() and convertBGR5A1toRGB5A1() for more info.
 			size = u32le(offset);
 			texture = {size, data: input.slice(offset+4, offset+(4+size))};
 		}
@@ -333,7 +338,7 @@ function readEmsPsuFile(input){
 					offset += ((fdesc.size & 0b11111111110000000000) + 1024);
 				} else {
 					offset += fdesc.size;
-					// if we're already filling sectors fully, no to change anything about it
+					// if we're already filling 1k blocks fully, why change the value?
 				}
 				output[fdesc.filename] = {
 					size: fdesc.size,
@@ -370,7 +375,7 @@ function readPsvFile(input){
 	const type1 = u32le(56);
 	const type2 = u32le(60);
 	if(type1 !== 0x2c && type2 !== 2) {
-		throw `Not parsing, this is not a PS2 save export (was ${type1}:${type2}, expected 44:2)`;
+		throw `Not parsing, this is not in the PS2 save export format (was ${type1}:${type2}, expected 44:2)`;
 	}
 	const displayedSize = u32le(64);
 	const ps2dOffset = u32le(68);
@@ -509,5 +514,10 @@ function readSharkXPortSxpsFile(input) {
 
 if(typeof module !== "undefined") {
 	// for C6JS
-	module.exports = {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, setDebug, setStrictness};
+	module.exports = {
+		readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile},
+		helpers: {uncompressTexture, convertBGR5A1toRGB5A1}, 
+		options: {setDebug, setStrictness},
+		version: ICONJS_VERSION
+	};
 }
