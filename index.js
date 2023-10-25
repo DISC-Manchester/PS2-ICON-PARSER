@@ -75,4 +75,6 @@ sys: Read a icon.sys (964 bytes) file, and attempt
      (suppress behaviour with --no-read-models)
 `		); // end of template
 	}
+	processObj.exit(1);
 }
+processObj.exit(0);
