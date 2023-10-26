@@ -39,7 +39,7 @@ function imf2gltf(icon = null, shape = 0, filename = "untitled") {
 	//setting up GLTF
 	gltfOutput.scene = 0;
 	gltfOutput.scenes = [{"nodes": [0]}];
-	gltfOutput.nodes = [{"mesh": 0}];
+	gltfOutput.nodes = [{"mesh": 0, "name": filename, "rotation": [1,0,0,0]}];
 	gltfOutput.meshes = [{
 		"primitives": [{
 			"attributes": {
@@ -52,6 +52,7 @@ function imf2gltf(icon = null, shape = 0, filename = "untitled") {
 		}]
 	}]; // no indices because who needs indexing when you're transcoding?
 	gltfOutput.materials = [{
+		"name": `Material (${filename}_${shape})`,
 		"pbrMetallicRoughness": {
 			"baseColorFactor": [1.0, 1.0, 1.0, 1.0],
 			"metallicFactor": 0.0,
@@ -64,9 +65,6 @@ function imf2gltf(icon = null, shape = 0, filename = "untitled") {
 	let colourArray = new Array();
 	icon.vertices.forEach(function(vertexObject){
 		verticesArray.push(vertexObject.shapes[shape].x);
-		//verticesArray.push(-vertexObject.shapes[shape].y); // -2.75
-		//if the above is applied, it completely breaks the orientation of the triangles
-		//just rotate 180deg in an authoring tool
 		verticesArray.push(vertexObject.shapes[shape].y);
 		verticesArray.push(vertexObject.shapes[shape].z);
 		normalsArray.push(vertexObject.normal.x);
@@ -74,9 +72,10 @@ function imf2gltf(icon = null, shape = 0, filename = "untitled") {
 		normalsArray.push(vertexObject.normal.z);
 		uvArray.push(vertexObject.uv.u);
 		uvArray.push(vertexObject.uv.v);
-		colourArray.push(vertexObject.color.r/255);
-		colourArray.push(vertexObject.color.g/255);
-		colourArray.push(vertexObject.color.b/255);
+		// gamma correction, glTF clients expect lineari(s|z)ed-sRGB, not sRGB.
+		colourArray.push(Math.pow((vertexObject.color.r/255), 2.2));
+		colourArray.push(Math.pow((vertexObject.color.g/255), 2.2));
+		colourArray.push(Math.pow((vertexObject.color.b/255), 2.2));
 		colourArray.push((vertexObject.color.a > 1) ? (vertexObject.color.a/255): 1);
 	});
 	let outputFloatArray = new Float32Array([...verticesArray, ...normalsArray, ...uvArray, ...colourArray]); // 3, 3, 2, 4
@@ -145,7 +144,7 @@ function imf2gltf(icon = null, shape = 0, filename = "untitled") {
 			"name": "Colour Accessor"
 		}
 	];
-	gltfOutput.asset = {"version": "2.0", "extras": {"IU_rotation": [0, 180.0, 0]}}
+	gltfOutput.asset = {"version": "2.0", "generator": `icondumper2/${icondumper2.version}`}
 	return {object: gltfOutput, buffer: outputFloatArray};
 }
 
@@ -218,5 +217,4 @@ sys: Read a icon.sys (964 bytes) file, and attempt
 		processObj.exit(1);
 	}
 }
-console.log("All shapes were exported upside down. I recommend you rotate them yourself.");
 processObj.exit(0);
