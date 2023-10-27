@@ -25,48 +25,27 @@ function rgb5a1_rgb8(colour) {
 	return output;
 } // TODO: support textures :P
 
-function imf2gltf(icon = null, shape = 0, filename = "untitled") {
+function imf2gltf(icon = null, filename = "untitled") {
 	if (icon === null) {
 		throw "Missing first argument, of which should be a icondumper2 Intermediate Model Format object.";
 	}
 	if (icon.hasOwnProperty("numberOfShapes") === false) {
 		throw "Expected a icondumper2 Intermediate Model Format object.";
 	}
-	if(shape >= icon.numberOfShapes) {
-		throw `Shape out of bounds. (object has ${icon.numberOfShapes} shapes.)`;
+	let shapesArray = new Array(icon.numberOfShapes);
+	for (let index = 0; index < icon.numberOfShapes; index++) {
+		shapesArray[index] = new Array();
 	}
-	const gltfOutput = new Object();
-	//setting up GLTF
-	gltfOutput.scene = 0;
-	gltfOutput.scenes = [{"nodes": [0]}];
-	gltfOutput.nodes = [{"mesh": 0, "name": filename, "rotation": [1,0,0,0]}];
-	gltfOutput.meshes = [{
-		"primitives": [{
-			"attributes": {
-				"POSITION": 0,
-				"NORMAL": 1,
-				"TEXCOORD_0": 2,
-				"COLOR_0": 3,
-			},
-			"material": 0
-		}]
-	}]; // no indices because who needs indexing when you're transcoding?
-	gltfOutput.materials = [{
-		"name": `Material (${filename}_${shape})`,
-		"pbrMetallicRoughness": {
-			"baseColorFactor": [1.0, 1.0, 1.0, 1.0],
-			"metallicFactor": 0.0,
-			"roughnessFactor": 1.0
-		}
-	}];
 	let verticesArray = new Array();
 	let normalsArray = new Array();
 	let uvArray = new Array();
 	let colourArray = new Array();
 	icon.vertices.forEach(function(vertexObject){
-		verticesArray.push(vertexObject.shapes[shape].x);
-		verticesArray.push(vertexObject.shapes[shape].y);
-		verticesArray.push(vertexObject.shapes[shape].z);
+		for (let index = 0; index < icon.numberOfShapes; index++) {
+			shapesArray[index].push(vertexObject.shapes[index].x);
+			shapesArray[index].push(vertexObject.shapes[index].y);
+			shapesArray[index].push(vertexObject.shapes[index].z);
+		}
 		normalsArray.push(vertexObject.normal.x);
 		normalsArray.push(vertexObject.normal.y);
 		normalsArray.push(vertexObject.normal.z);
@@ -78,88 +57,127 @@ function imf2gltf(icon = null, shape = 0, filename = "untitled") {
 		colourArray.push(Math.pow((vertexObject.color.b/255), 2.2));
 		colourArray.push((vertexObject.color.a > 1) ? (vertexObject.color.a/255): 1);
 	});
-	let outputFloatArray = new Float32Array([...verticesArray, ...normalsArray, ...uvArray, ...colourArray]); // 3, 3, 2, 4
-	gltfOutput.buffers = [{"uri": `${filename}.bin`, "byteLength": outputFloatArray.byteLength}];
-	gltfOutput.bufferViews = [
-		{
-			"buffer": 0,
-			"byteOffset": 0,
-			"byteLength": (verticesArray.length*4),
-			"target": gltfConstants.ARRAY_BUFFER
-		},
-		{
-			"buffer": 0,
-			"byteOffset": (verticesArray.length*4),
-			"byteLength": (normalsArray.length*4),
-			"target": gltfConstants.ARRAY_BUFFER
-		},
-		{
-			"buffer": 0,
-			"byteOffset": ((verticesArray.length*4)+(normalsArray.length*4)),
-			"byteLength": (uvArray.length*4),
-			"target": gltfConstants.ARRAY_BUFFER
-		},
-		{
-			"buffer": 0,
-			"byteOffset": (((verticesArray.length*4)+(normalsArray.length*4))+(uvArray.length*4)),
-			"byteLength": (colourArray.length*4),
-			"target": gltfConstants.ARRAY_BUFFER
-		}
-	];
-	gltfOutput.accessors = [
-		{
-			"bufferView": 0,
-			"componentType": gltfConstants.FLOAT,
-			"count": verticesArray.length/3,
-			"type": "VEC3",
-			"max": [ 4.0,  4.0,  4.0],
-			"min": [-4.0, -4.0, -4.0],
-			"name": "Vertex Position Accessor"
-		},
-		{
-			"bufferView": 1,
-			"componentType": gltfConstants.FLOAT,
-			"count": (normalsArray.length/3),
-			"type": "VEC3",
-			"max": [ 1.0,  1.0,  1.0],
-			"min": [-1.0, -1.0, -1.0],
-			"name": "Normal Accessor"
-		},
-		{
-			"bufferView": 2,
-			"componentType": gltfConstants.FLOAT,
-			"count": (uvArray.length/2),
-			"type": "VEC2",
-			"max": [ 1.0,  1.0],
-			"min": [ 0.0,  0.0],
-			"name": "Texture Coordinate Accessor"
-		},
-		{
-			"bufferView": 3,
-			"componentType": gltfConstants.FLOAT,
-			"count": (colourArray.length/4),
-			"type": "VEC4",
-			"max": [ 1.0,  1.0,  1.0,  1.0],
-			"min": [ 0.0,  0.0,  0.0,  1.0],
-			"name": "Colour Accessor"
-		}
-	];
-	gltfOutput.asset = {"version": "2.0", "generator": `icondumper2/${icondumper2.version}`}
-	return {object: gltfOutput, buffer: outputFloatArray};
+	shapesArray.forEach(function(arr) {
+		verticesArray = [...verticesArray, ...arr];
+	});
+	let outputFloatArray = new Float32Array([...verticesArray, ...normalsArray, ...uvArray, ...colourArray]); // 3[nOS], 3, 2, 4#
+	let gltfOutputArray = new Array(icon.numberOfShapes);
+	for (let index = 0; index < icon.numberOfShapes; index++) {
+		const gltfOutput = new Object();
+		//setting up GLTF
+		gltfOutput.scene = 0;
+		gltfOutput.scenes = [{"name": filename, "nodes": [0]}];
+		gltfOutput.nodes = [{"mesh": 0, "name": `${filename}#${index}`, "rotation": [1,0,0,0]}];
+		gltfOutput.meshes = [{
+			"name": `Mesh (${filename}#${index})`,
+			"primitives": [{
+				"attributes": {
+					"POSITION": 0,
+					"NORMAL": 1,
+					"TEXCOORD_0": 2,
+					"COLOR_0": 3,
+				},
+				"material": 0
+			}]
+		}]; // no indices because who needs indexing when you're transcoding?
+		gltfOutput.materials = [{
+			"name": `Material (${filename}#${index})`,
+			"pbrMetallicRoughness": {
+				"baseColorFactor": [1.0, 1.0, 1.0, 1.0],
+				"metallicFactor": 0.0,
+				"roughnessFactor": 1.0
+			},
+			"extensions": { // or else artifacts.
+				"KHR_materials_specular": {
+					"specularFactor": 0, // this value is less respected then sCF, blender/glTF is main example of this.
+					"specularColorFactor": [0, 0, 0]
+				}
+			}
+		}];
+		gltfOutput.buffers = [{"uri": `${filename}.bin`, "byteLength": outputFloatArray.byteLength}];
+		gltfOutput.bufferViews = [
+			{
+				"buffer": 0,
+				"byteOffset": (((icon.vertices.length*3)*4)*index),
+				"byteLength": ((icon.vertices.length*3)*4),
+				"target": gltfConstants.ARRAY_BUFFER
+			},
+			{
+				"buffer": 0,
+				"byteOffset": (((icon.vertices.length*3)*4)*icon.numberOfShapes),
+				"byteLength": (normalsArray.length*4),
+				"target": gltfConstants.ARRAY_BUFFER
+			},
+			{
+				"buffer": 0,
+				"byteOffset": ((((icon.vertices.length*3)*4)*icon.numberOfShapes)+(normalsArray.length*4)),
+				"byteLength": (uvArray.length*4),
+				"target": gltfConstants.ARRAY_BUFFER
+			},
+			{
+				"buffer": 0,
+				"byteOffset": (((((icon.vertices.length*3)*4)*icon.numberOfShapes)+(normalsArray.length*4))+(uvArray.length*4)),
+				"byteLength": (colourArray.length*4),
+				"target": gltfConstants.ARRAY_BUFFER
+			}
+		];
+		gltfOutput.accessors = [
+			{
+				"bufferView": 0,
+				"componentType": gltfConstants.FLOAT,
+				"count": icon.vertices.length,
+				"type": "VEC3",
+				"max": [ 4.0,  4.0,  4.0],
+				"min": [-4.0, -4.0, -4.0],
+				"name": "Vertex Position Accessor"
+			},
+			{
+				"bufferView": 1,
+				"componentType": gltfConstants.FLOAT,
+				"count": icon.vertices.length,
+				"type": "VEC3",
+				"max": [ 1.0,  1.0,  1.0],
+				"min": [-1.0, -1.0, -1.0],
+				"name": "Normal Accessor"
+			},
+			{
+				"bufferView": 2,
+				"componentType": gltfConstants.FLOAT,
+				"count": icon.vertices.length,
+				"type": "VEC2",
+				"max": [ 1.0,  1.0],
+				"min": [ 0.0,  0.0],
+				"name": "Texture Coordinate Accessor"
+			},
+			{
+				"bufferView": 3,
+				"componentType": gltfConstants.FLOAT,
+				"count": icon.vertices.length,
+				"type": "VEC4",
+				"max": [ 1.0,  1.0,  1.0,  1.0],
+				"min": [ 0.0,  0.0,  0.0,  1.0],
+				"name": "Colour Accessor"
+			}
+		];
+		gltfOutput.asset = {"version": "2.0", "generator": `icondumper2/${icondumper2.version}`}
+		gltfOutput.extensionsUsed = ["KHR_materials_specular"];
+		gltfOutputArray[index] = (gltfOutput);
+	}
+	return {objects: gltfOutputArray, buffer: outputFloatArray};
 }
 
-function loadAndConvertIcon(inputData, state = "-") {
+function loadAndConvertIcon(inputData, attemptedFilename = "-") {
 	if (inputData.hasOwnProperty("numberOfShapes") === false) {
 		throw "Expected a icondumper2 Intermediate Model Format object.";
 	}
+	const filename = encodeURIComponent(attemptedFilename).replaceAll(/\%[0-9A-F]{2,2}/g, "").replaceAll(".", "_");
+	const glTF_output = imf2gltf(inputData, filename);
 	for (let index = 0; index < (inputData.numberOfShapes); index++) {
-		const filename = `export_${state}_${index}`;
-		const gltfFile = imf2gltf(inputData, index, filename);
-
-		(require("fs")).writeFileSync(`${filename}.gltf`, new TextEncoder().encode(JSON.stringify(gltfFile.object)));
-		(require("fs")).writeFileSync(`${filename}.bin`, gltfFile.buffer);
-		console.log(`Saved shape ${index} as "${filename}.gltf", "${filename}.bin" pair.`);
+		(require("fs")).writeFileSync(`${filename}_${index}.gltf`, new TextEncoder().encode(JSON.stringify(glTF_output.objects[index])));
+		console.log(`Saved shape ${filename}#${index} as "${filename}_${index}.gltf".`);
 	}
+	(require("fs")).writeFileSync(`${filename}.bin`, glTF_output.buffer);
+	console.log(`Saved glTF buffer as "${filename}.bin".\n`);
 }
 
 // can anything de-dupe this code somehow? (index.js)
@@ -169,17 +187,27 @@ switch(processObj.argv[2]) {
 		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.psu");
 		const parsed = iconjs.readEmsPsuFile(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
 		const PS2D = iconjs.readPS2D(parsed[parsed.rootDirectory]["icon.sys"].data);
-		Object.keys(PS2D.filenames).forEach(function(file) {
-			loadAndConvertIcon(iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames[file]].data), file);
-		});
+		loadAndConvertIcon(iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames.n].data), PS2D.filenames.n);
+		if(PS2D.filenames.n !== PS2D.filenames.c) {
+			loadAndConvertIcon(iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames.c].data), PS2D.filenames.c);
+		}
+		if(PS2D.filenames.n !== PS2D.filenames.d) {
+			loadAndConvertIcon(iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames.d].data), PS2D.filenames.d);
+		}
 		break;
 	}
 	case "psv": {
 		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.psv");
 		const parsed = iconjs.readPsvFile(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
-		loadAndConvertIcon(iconjs.readIconFile(parsed.icons.n), "n")
-		loadAndConvertIcon(iconjs.readIconFile(parsed.icons.c), "c")
-		loadAndConvertIcon(iconjs.readIconFile(parsed.icons.d), "d")
+		const PS2D = iconjs.readPS2D(parsed["icon.sys"]);
+		//i should probably make PSV readers more like the others, but why should I? It's giving me shortcuts to what I want.
+		loadAndConvertIcon(iconjs.readIconFile(parsed.icons.n), PS2D.filenames.n)
+		if(PS2D.filenames.n !== PS2D.filenames.c) {
+			loadAndConvertIcon(iconjs.readIconFile(parsed.icons.c), PS2D.filenames.c)
+		}
+		if(PS2D.filenames.n !== PS2D.filenames.d) {
+			loadAndConvertIcon(iconjs.readIconFile(parsed.icons.d), PS2D.filenames.d)
+		}
 		break;
 	}
 	case "sps":
@@ -187,19 +215,28 @@ switch(processObj.argv[2]) {
 		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.sps");
 		const parsed = iconjs.readSharkXPortSxpsFile(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
 		const PS2D = iconjs.readPS2D(parsed[parsed.rootDirectory]["icon.sys"].data);
-		Object.keys(PS2D.filenames).forEach(function(file) {
-			loadAndConvertIcon(iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames[file]].data), file);
-		});
+		loadAndConvertIcon(iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames.n].data), PS2D.filenames.n);
+		if(PS2D.filenames.n !== PS2D.filenames.c) {
+			loadAndConvertIcon(iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames.c].data), PS2D.filenames.c);
+		}
+		if(PS2D.filenames.n !== PS2D.filenames.d) {
+			loadAndConvertIcon(iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames.d].data), PS2D.filenames.d);
+		}
 		break;
 	}
 	case "sys": {
 		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "icon.sys");
-		const metadata = iconjs.readPS2D(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
-		Object.keys(metadata.filenames).forEach(function(file) {
-			let getFile = filesystem.readFileSync(metadata.filenames[file]);
-			loadAndConvertIcon(iconjs.readIconFile(getFile.buffer.slice(getFile.byteOffset, getFile.byteOffset + getFile.byteLength)), file);
-			//console.log(individialIcon);
-		});
+		const PS2D = iconjs.readPS2D(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
+		let getFile = filesystem.readFileSync(PS2D.filenames.n);
+		loadAndConvertIcon(iconjs.readIconFile(getFile.buffer.slice(getFile.byteOffset, getFile.byteOffset + getFile.byteLength)), PS2D.filenames.n);
+		if(PS2D.filenames.n !== PS2D.filenames.c) {
+			let getFile = filesystem.readFileSync(PS2D.filenames.c);
+			loadAndConvertIcon(iconjs.readIconFile(getFile.buffer.slice(getFile.byteOffset, getFile.byteOffset + getFile.byteLength)), PS2D.filenames.c);
+		}
+		if(PS2D.filenames.n !== PS2D.filenames.d) {
+			let getFile = filesystem.readFileSync(PS2D.filenames.d);
+			loadAndConvertIcon(iconjs.readIconFile(getFile.buffer.slice(getFile.byteOffset, getFile.byteOffset + getFile.byteLength)), PS2D.filenames.d);
+		}
 		break;
 	}
 	default: {
