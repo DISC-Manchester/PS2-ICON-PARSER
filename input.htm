@@ -376,7 +376,7 @@
 				filebox.files[0].arrayBuffer().then(function(d){
 					try {
 						let output = readPS2D(d);
-						console.log("icon.sys", output);
+						console.info("icon.sys", output);
 						updateDisplay(output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
@@ -393,7 +393,7 @@
 					try {
 						let output = readIconFile(d);
 						renderIcon(output);
-						console.log("model data (ic*)",output);
+						console.info("model data (ic*)",output);
 					} catch(e) {
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
 						alert(e);
@@ -421,8 +421,8 @@
 						//TODO: use Time() to align JST times to user-local timezone
 						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
-						console.log("model files (psu)", output2);
-						console.log("icon.sys (psu)", output);
+						console.info("model files (psu)", output2);
+						console.info("icon.sys (psu)", output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
@@ -452,8 +452,8 @@
 						//TODO: use Time() to align JST times to user-local timezone
 						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
-						console.log("model files (psv)", icons);
-						console.log("icon.sys (psv)", output);
+						console.info("model files (psv)", icons);
+						console.info("icon.sys (psv)", output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
@@ -484,8 +484,8 @@
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
 						document.getElementById("fileCommentGame").textContent = vFilesystem.comments.game;
 						document.getElementById("fileCommentName").textContent = vFilesystem.comments.name;
-						console.log("model files (*ps)", output2);
-						console.log("icon.sys (*ps)", output);
+						console.info("model files (*ps)", output2);
+						console.info("icon.sys (*ps)", output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
@@ -502,7 +502,7 @@
 					return shader;
 				}
 
-				console.log(gl.getShaderInfoLog(shader), (new String().padStart(60, "-")), source);
+				console.debug(gl.getShaderInfoLog(shader), (new String().padStart(60, "-")), source);
 				gl.deleteShader(shader);
 			}
 			function createProgram(gl, vertexShader, fragmentShader) {
@@ -515,7 +515,7 @@
 					return program;
 				}
 
-				console.log(gl.getProgramInfoLog(program));
+				console.debug(gl.getProgramInfoLog(program));
 				gl.deleteProgram(program);
 			}
 			const bgCanvas = document.getElementById("bgcanvas");
@@ -553,6 +553,8 @@
 			if(glBgContext !== null) {
 				//.section CONFIGURATION
 				glFgContext.enable(glFgContext.DEPTH_TEST);
+				glFgContext.enable(glFgContext.CULL_FACE);
+				glFgContext.cullFace(glFgContext.BACK);
 				//.section CLEAR
 				glBgContext.clearColor(0.1,0.1,0.4,1);
 				glBgContext.clear(glBgContext.COLOR_BUFFER_BIT | glBgContext.DEPTH_BUFFER_BIT);
@@ -569,6 +571,6 @@
 		</script>
 		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; 2023 yellows111</span>
 		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>
-		<script>document.getElementById("clientVersion").textContent = "0.6.3";</script>
+		<script>document.getElementById("clientVersion").textContent = "0.6.4";</script>
 	</body>
 </html>

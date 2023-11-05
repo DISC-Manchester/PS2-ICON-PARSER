@@ -2,7 +2,7 @@
 //LOOKING FOR: LZARI implementation (for MAX), description of CBS compression (node zlib doesn't tackle it, even with RC4'ing the data)
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
-ICONJS_VERSION = "0.5.0";
+ICONJS_VERSION = "0.5.1";
 
 function setDebug(value) {
 	ICONJS_DEBUG = !!value;
@@ -148,7 +148,7 @@ function readPS2D(input) {
 		d: stringScrubber((new TextDecoder("utf-8")).decode(int_filename_d))
 	}
 	if(ICONJS_DEBUG){
-		console.log({header, titleOffset, bgAlpha, bgColors, lightIndices, lightColors, title, filenames});
+		console.debug({header, titleOffset, bgAlpha, bgColors, lightIndices, lightColors, title, filenames});
 	}
 	return {filenames, title, background: {colors: bgColors, alpha: bgAlpha}, lighting: {points: lightIndices, colors: lightColors}};
 }
@@ -267,7 +267,7 @@ function readIconFile(input) {
 		}
 	}
 	if(ICONJS_DEBUG){
-		console.log({magic, numberOfShapes, textureType, textureFormat, numberOfVertexes, chunkLength, vertices, animationHeader, animData, texture});
+		console.debug({magic, numberOfShapes, textureType, textureFormat, numberOfVertexes, chunkLength, vertices, animationHeader, animData, texture});
 	}
 	return {numberOfShapes, vertices, textureFormat, texture, animData};
 }
@@ -307,7 +307,7 @@ function readEntryBlock(input) {
 	const int_filename = input.slice(0x40, 512); 
 	const filename = stringScrubber((new TextDecoder("utf-8")).decode(int_filename));
 	if(ICONJS_DEBUG){
-		console.log({permissions, type, size, createdTime, sectorOffset, dirEntry, modifiedTime, specialSection, filename});
+		console.debug({permissions, type, size, createdTime, sectorOffset, dirEntry, modifiedTime, specialSection, filename});
 	}
 	return {type, size, filename, createdTime, modifiedTime};
 }
@@ -330,7 +330,7 @@ function readEmsPsuFile(input){
 			}
 			case "file": {
 				if(ICONJS_DEBUG){
-					console.log(`PARSING | F: "${fdesc.filename}" O: ${offset} S: ${fdesc.size}`);
+					console.debug(`PARSING | F: "${fdesc.filename}" O: ${offset} S: ${fdesc.size}`);
 				}
 				offset += 512;
 				const originalOffset = offset;
@@ -404,7 +404,7 @@ function readPsvFile(input){
 		d: input.slice(dModelOffset, dModelOffset+dModelSize),
 	}
 	if (ICONJS_DEBUG) {
-		console.log({magic, type1, type2, displayedSize, ps2dOffset, ps2dSize, nModelOffset, nModelSize, cModelOffset, cModelSize, dModelOffset, dModelSize, numberOfFiles, rootDirectoryData, fileData})
+		console.debug({magic, type1, type2, displayedSize, ps2dOffset, ps2dSize, nModelOffset, nModelSize, cModelOffset, cModelSize, dModelOffset, dModelSize, numberOfFiles, rootDirectoryData, fileData})
 	}
 	return {icons, "icon.sys": input.slice(ps2dOffset, ps2dOffset+ps2dSize), timestamps};
 }
@@ -449,7 +449,7 @@ function readSxpsDescriptor(input) {
 	const int_shiftjisName = input.slice(178, 242); // Because why parse a PS2D when you can hard-code it?
 	//:skip 8
 	if(ICONJS_DEBUG) {
-		console.log({int_filename, size, startSector, endSector, permissions, type, timestamps, int_asciiName, int_shiftjisName});
+		console.debug({int_filename, size, startSector, endSector, permissions, type, timestamps, int_asciiName, int_shiftjisName});
 	}
 	return {type, size, filename, timestamps};
 }
@@ -495,7 +495,7 @@ function readSharkXPortSxpsFile(input) {
 			}
 			case "file": {
 				if(ICONJS_DEBUG){
-					console.log(`PARSING | F: "${fdesc.filename}" O: ${offset} S: ${fdesc.size}`);
+					console.debug(`PARSING | F: "${fdesc.filename}" O: ${offset} S: ${fdesc.size}`);
 				}
 				offset += 250;
 				output[fdesc.filename] = {

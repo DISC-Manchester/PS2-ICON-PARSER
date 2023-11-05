@@ -11,19 +11,36 @@ const gltfConstants = {
 	"REPEAT": 10497
 };
 
+function getCrc32(data) {
+	let output = -1;
+	for (let byteIndex of data) {
+		for (let index = 0; index < 8; index++, byteIndex >>>= 1) {
+			output = (output >>> 1) ^ (-((output ^ byteIndex) & 1) & 0xEDB88320);
+		} // 0xEDB88320 is a reverse polynomial that's common in crc32
+	} //i know it's some bitwise madness, it works, either way.
+	return ((~output) >>> 0);
+}
+
+function getAdler32(data) {
+	let s1 = 1;
+	let s2 = 0;
+	for (let index of data) {
+		s1 = (s1 + index) % 65521;
+		s2 = (s2 + s1) % 65521;
+	}
+	return (s2 << 16) | s1;
+}
+
 function rgb5a1_rgb8(colour) {
-	let b = ( colour         & 0b11111);
+	let b = ( colour        & 0b11111);
 	let g = ((colour >>  5) & 0b11111);
 	let r = ((colour >> 10) & 0b11111);
-	//let a = ( color >> 15 );
 	let output = new Number();
 	output |= ((r * 8) << 16);
-	output |= ((g * 8) << 8);
-	output |= ((b * 8) << 0);
-	output *= 256;
-	output += (255); // couldn't do a |= as that converts it to signed, (a+1)*255
+	output |= ((g * 8) <<  8);
+	output |= ((b * 8) <<  0);
 	return output;
-} // TODO: support textures :P
+}
 
 function imf2gltf(icon = null, filename = "untitled") {
 	if (icon === null) {
@@ -83,15 +100,10 @@ function imf2gltf(icon = null, filename = "untitled") {
 		gltfOutput.materials = [{
 			"name": `Material (${filename}#${index})`,
 			"pbrMetallicRoughness": {
-				"baseColorFactor": [1.0, 1.0, 1.0, 1.0],
-				"metallicFactor": 0.0,
-				"roughnessFactor": 1.0
+				"baseColorTexture": {"index":0, "texCoord": 0}
 			},
-			"extensions": { // or else artifacts.
-				"KHR_materials_specular": {
-					"specularFactor": 0, // this value is less respected then sCF, blender/glTF is main example of this.
-					"specularColorFactor": [0, 0, 0]
-				}
+			"extensions": { // or we get annoying PBR and specular stuff we don't need
+				"KHR_materials_unlit": {}
 			}
 		}];
 		gltfOutput.buffers = [{"uri": `${filename}.bin`, "byteLength": outputFloatArray.byteLength}];
@@ -146,7 +158,7 @@ function imf2gltf(icon = null, filename = "untitled") {
 				"count": icon.vertices.length,
 				"type": "VEC2",
 				"max": [ 1.0,  1.0],
-				"min": [ 0.0,  0.0],
+				"min": [-1.0, -1.0],
 				"name": "Texture Coordinate Accessor"
 			},
 			{
@@ -160,10 +172,77 @@ function imf2gltf(icon = null, filename = "untitled") {
 			}
 		];
 		gltfOutput.asset = {"version": "2.0", "generator": `icondumper2/${icondumper2.version}`}
-		gltfOutput.extensionsUsed = ["KHR_materials_specular"];
+		gltfOutput.extensionsUsed = ["KHR_materials_unlit"];
+		gltfOutput.textures = [{"source": 0}];
+		gltfOutput.images = [{"name": `Texture (${filename}#${index})`, "uri": `${filename}.png`}]
 		gltfOutputArray[index] = (gltfOutput);
 	}
-	return {objects: gltfOutputArray, buffer: outputFloatArray};
+	let texture16 = null; // Uint16Array(16384)
+	switch(icon.textureFormat) {
+		case "N": {
+			texture16 = (new Uint16Array(16384)).fill(0xffff);
+			break;
+		}
+		case "C": {
+			texture16 = icondumper2.helpers.uncompressTexture(icon.texture.data);
+			break;
+		}
+		case "U": {
+			texture16 = icon.texture;
+			break;
+		}
+	}
+	let texture24 = new Uint8Array(49983);
+	texture24.set([
+		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+		0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+		0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80,
+		0x08, 0x02, 0x00, 0x00, 0x00, // you may know 
+		0x4c, 0x5c, 0xf6, 0x9c, // what this is from 0x89.
+		0x00, 0x00, 0xc3, 0x06, 0x49, 0x44, 0x41, 0x54,
+		0x78, 0x01 // if you didn't get it, here's a clue
+	],0);
+	let textureOffset = 43;
+	let texture24Data = new Array();
+	let texture24CheckedData = new Array();
+	for (let x = 0; x < 128; x++) {
+		let line = [(x === 127 ? 1 : 0), 0x81, 0x01, 0x7e, 0xfe, 0x00];
+		texture24Data = texture24Data.concat(line);
+		texture24CheckedData.push(0);
+		let scanline = new Array(128*3);
+		for (let y = 0; y < 128; y++) {
+			color = rgb5a1_rgb8(texture16[(x*128)+y]);
+			scanline[(y*3)  ] = ((color >> 0 ) & 255);
+			scanline[(y*3)+1] = ((color >> 8 ) & 255);
+			scanline[(y*3)+2] = ((color >> 16) & 255);
+		}
+		texture24Data = texture24Data.concat(scanline);
+		texture24CheckedData = texture24CheckedData.concat(scanline);
+	}
+	texture24.set(texture24Data, textureOffset);
+	textureOffset += texture24Data.length;
+	let a32conv = new DataView(new ArrayBuffer(4));
+	a32conv.setInt32(0, getAdler32(new Uint8Array(texture24CheckedData)))
+	texture24.set([a32conv.getUint8(0), a32conv.getUint8(1), a32conv.getUint8(2), a32conv.getUint8(3)], textureOffset);
+	textureOffset += 4;
+	let crc32 = getCrc32(new Uint8Array([
+		0x49, 0x44, 0x41, 0x54, 0x78, 0x01, ...texture24Data, 
+		a32conv.getUint8(0), a32conv.getUint8(1), 
+		a32conv.getUint8(2), a32conv.getUint8(3)
+	]));
+	texture24.set([
+		(crc32 >> 24) & 0xff, 
+		(crc32 >> 16) & 0xff, 
+		(crc32 >>  8) & 0xff, 
+		 crc32        & 0xff
+	], textureOffset);
+	textureOffset += 4;
+	texture24.set([
+		0x00, 0x00, 0x00, 0x00,
+		0x49, 0x45, 0x4E, 0x44, 
+		0xae, 0x42, 0x60, 0x82
+	], textureOffset);
+	return {objects: gltfOutputArray, buffer: outputFloatArray, texture: texture24};
 }
 
 function loadAndConvertIcon(inputData, attemptedFilename = "-") {
@@ -174,14 +253,17 @@ function loadAndConvertIcon(inputData, attemptedFilename = "-") {
 	const glTF_output = imf2gltf(inputData, filename);
 	for (let index = 0; index < (inputData.numberOfShapes); index++) {
 		(require("fs")).writeFileSync(`${filename}_${index}.gltf`, new TextEncoder().encode(JSON.stringify(glTF_output.objects[index])));
-		console.log(`Saved shape ${filename}#${index} as "${filename}_${index}.gltf".`);
+		console.info(`Saved shape ${filename}#${index} as "${filename}_${index}.gltf".`);
 	}
 	(require("fs")).writeFileSync(`${filename}.bin`, glTF_output.buffer);
-	console.log(`Saved glTF buffer as "${filename}.bin".\n`);
+	console.info(`Saved glTF buffer as "${filename}.bin".`);
+
+	(require("fs")).writeFileSync(`${filename}.png`, glTF_output.texture);
+	console.info(`Saved texture as "${filename}.png".\n`);
 }
 
 // can anything de-dupe this code somehow? (index.js)
-console.log(`icon.js version ${icondumper2.version}, 2023 (c) yellows111`);
+console.info(`icon.js version ${icondumper2.version}, 2023 (c) yellows111`);
 switch(processObj.argv[2]) {
 	case "psu": {
 		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.psu");
@@ -241,7 +323,7 @@ switch(processObj.argv[2]) {
 	}
 	default: {
 		//Template literal goes here.
-		console.log(
+		console.info(
 `${(processObj.argv.length > 2) ? "Unknown argument: "+processObj.argv[2]+"\n\n": ""}icondumper2 node.js client (glTF exporter version) subcommands:
 psu: Read a EMS Memory Adapter export file.
 psv: Read a PS3 export file.
