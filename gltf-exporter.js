@@ -139,8 +139,8 @@ function imf2gltf(icon = null, filename = "untitled") {
 				"componentType": gltfConstants.FLOAT,
 				"count": icon.vertices.length,
 				"type": "VEC3",
-				"max": [ 4.0,  4.0,  4.0],
-				"min": [-4.0, -4.0, -4.0],
+				"max": [ 5.0,  5.0,  5.0],
+				"min": [-5.0, -5.0, -5.0],
 				"name": "Vertex Position Accessor"
 			},
 			{
@@ -263,7 +263,7 @@ function loadAndConvertIcon(inputData, attemptedFilename = "-") {
 }
 
 // can anything de-dupe this code somehow? (index.js)
-console.info(`icon.js version ${icondumper2.version}, 2023 (c) yellows111`);
+console.info(`icon.js version ${icondumper2.version}, ${(new Date()).getFullYear().toString()} (c) yellows111`);
 switch(processObj.argv[2]) {
 	case "psu": {
 		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.psu");
@@ -321,6 +321,12 @@ switch(processObj.argv[2]) {
 		}
 		break;
 	}
+	case "ico":
+	case "icn": {
+		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "input.icn");
+		loadAndConvertIcon(iconjs.readIconFile(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength)), require("path").basename(processObj.argv[3]));
+		break;
+	}
 	default: {
 		//Template literal goes here.
 		console.info(
@@ -332,6 +338,7 @@ xps: Read a X-Port export file.
 
 sys: Read a icon.sys (964 bytes) file, and attempt
      to read icon files from the current directory.
+icn: Read an icon file directly. (Also as: ico)
 `		); // end of template
 		processObj.exit(1);
 	}

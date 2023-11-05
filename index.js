@@ -12,7 +12,7 @@ require("util").inspect.defaultOptions.depth = 2;
 icondumper2.options.setDebug(false);
 
 // node.js client
-console.log(`icon.js version ${icondumper2.version}, 2023 (c) yellows111`);
+console.log(`icon.js version ${icondumper2.version}, ${(new Date()).getFullYear().toString()} (c) yellows111`);
 switch(processObj.argv[2]) {
 	case "psu": {
 		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.psu");
@@ -61,6 +61,12 @@ switch(processObj.argv[2]) {
 		}
 		break;
 	}
+	case "ico":
+	case "icn": {
+		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "input.icn");
+		console.log(`contents of ${require("path").basename(processObj.argv[3])}:`, iconjs.readIconFile(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength)));
+		break;
+	}
 	default: {
 		//Template literal goes here.
 		console.log(
@@ -73,6 +79,7 @@ xps: Read a X-Port export file.
 sys: Read a icon.sys (964 bytes) file, and attempt
      to read icon files from the current directory.
      (suppress behaviour with --no-read-models)
+icn: Read an icon file directly. (Also as: ico)
 `		); // end of template
 	}
 	processObj.exit(1);

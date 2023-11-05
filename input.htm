@@ -569,8 +569,11 @@
 			}
 			//todo: More than one model shape rendering, other 2 icons, Animation parsing, animation tweening
 		</script>
-		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; 2023 yellows111</span>
-		<script>document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;</script>
-		<script>document.getElementById("clientVersion").textContent = "0.6.4";</script>
+		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
+		<script>
+			document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;
+			document.getElementById("clientVersion").textContent = "0.6.4";
+			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
+		</script>
 	</body>
 </html>

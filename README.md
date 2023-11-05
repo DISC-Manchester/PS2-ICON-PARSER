@@ -10,12 +10,13 @@ A JavaScript library (sorta) to read PS2 icons, and their related formats.
 * PS2D format (icon.sys)
 
 ## What can it do
-* Allow any file in a PSU's virtual filesystem to be dumped.
-* Warn of invalid icon.sys titles.
+* Allow any file in a PSU's or SPS/XPS's virtual filesystem to be dumped.
+* Warn of invalid icon.sys display names.
 * Read and parse an EMS MA export file.
 * Export the icon model, with all seperate shapes included to a JavaScript Object.
 * Node.js compatible (CommonJS) exporting while still being compatible with other JavaScript implementations.
 * Convert a 128x128x16 BGR5A1 bitmap to a RGB5A1 format.
+* Convert an icon or a set of icons to glTF, with textures.
 
 ## What it doesn't do
 * (Re)build save files.
