@@ -117,7 +117,7 @@
 			<h1 id="title1">&#xFF2E;&#xFF4F;&#x3000;&#xFF26;&#xFF49;&#xFF4C;&#xFF45;</h1> 
 			<h1 id="title2">&#xFF2C;&#xFF4F;&#xFF41;&#xFF44;&#xFF45;&#xFF44;</h1>
 		</div>
-		<span>Background/icon preview (rotate: &larr;/&rarr; keys, scale: &uarr;/&darr; keys):</span><br>
+		<span>Background/icon preview (Keyboard controls: rotate: &larr;/&rarr;, scale: &uarr;/&darr;, frame-step: &minus;/&equals;, change icon: 1:N/2:C/3:D):</span><br>
 		<canvas id="bgcanvas" width="480" height="480"></canvas>
 		<canvas id="iconcanvas" width="480" height="480"></canvas>
 		<hr>
@@ -151,7 +151,7 @@
 		</p>
 		<script>
 			// I usually don't do in-body <script>'s, but I didn't want to do an await onload() again
-			const GlobalState = {rotations: 2, dataLength: 0, uniforms: {rotation: null, scale: null}};
+			const GlobalState = {rotations: 2, dataLength: 0, uniforms: {rotation: null, scale: null}, iconState: {source: null, currentIcon: null, currentSubmodel: 0, cachedIconSys: null}};
 			// I don't care HOW disgusting doing this is, I'm sick of pressing escape to clear these.
 			let allInputs = document.querySelectorAll('input[type="file"]');
 			allInputs.forEach(
@@ -164,7 +164,7 @@
 			// rotation stuff
 			const rotationDensity = 60;
 			document.body.onkeydown = function(ev) {
-				if(glBgContext === null) {return;}
+				if(glBgContext === null || GlobalState.iconState.currentIcon === null) {return;}
 					if(typeof GlobalState.uniforms.rotation !== "undefined") {
 					switch(ev.code) {
 						case "ArrowLeft": {
@@ -185,6 +185,40 @@
 						case "ArrowDown": {
 							GlobalState.scale += 0.1;
 							if(GlobalState.scale >= 6.0) {GlobalState.scale = 6.0;}
+							break;
+						}
+						case "Minus": {
+							GlobalState.iconState.currentSubmodel--;
+							if(GlobalState.iconState.currentSubmodel < 0) {
+								GlobalState.iconState.currentSubmodel = GlobalState.iconState.currentIcon.numberOfShapes - 1;
+							}
+							renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
+							break;
+						}
+						case "Equal": {
+							GlobalState.iconState.currentSubmodel++;
+							if(GlobalState.iconState.currentSubmodel > (GlobalState.iconState.currentIcon.numberOfShapes - 1)) {
+								GlobalState.iconState.currentSubmodel = 0;
+							}
+							renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
+							break;
+						}
+						case "Digit1": {
+							GlobalState.iconState.currentSubmodel = 0;
+							GlobalState.iconState.currentIcon = GlobalState.iconState.source.n;
+							renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
+							break;
+						}
+						case "Digit2": {
+							GlobalState.iconState.currentSubmodel = 0;
+							GlobalState.iconState.currentIcon = GlobalState.iconState.source.c;
+							renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
+							break;
+						}
+						case "Digit3": {
+							GlobalState.iconState.currentSubmodel = 0;
+							GlobalState.iconState.currentIcon = GlobalState.iconState.source.d;
+							renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
 							break;
 						}
 						default: {
@@ -226,6 +260,7 @@
 				}
 			}
 			function resetDisplay() {
+				//reset displayed elements
 				document.getElementById("title1").textContent = "\uff0d";
 				document.getElementById("title2").textContent = "\uff0d";
 				document.getElementById("iconn").textContent = "?";
@@ -235,8 +270,19 @@
 				document.getElementById("dateModified").textContent = "--:--:-- --/--/----";
 				document.getElementById("fileCommentGame").textContent = "(no title)";
 				document.getElementById("fileCommentName").textContent = "(no description)";
+				//reset globalstate parameters
+				GlobalState.iconState.cachedIconSys = null;
+				GlobalState.iconState.currentIcon = null;
+				GlobalState.iconState.source = null;
+				GlobalState.uniforms.rotation = null;
+				GlobalState.uniforms.scale = null;
+				GlobalState.dataLength = 0;
+				GlobalState.rotations = 2;
+				GlobalState.iconState.currentSubmodel = 0;
+				//clear buffers
+				glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);
 			}
-			function renderIcon(iconData, fileMetadata = null) {
+			function renderIcon(iconData, fileMetadata = null, clearData = true) {
 				if(fileMetadata === null) {
 					fileMetadata = {
 						"lighting": {
@@ -249,7 +295,7 @@
 							]
 						}
 					};
-				}
+				};
 				if(glFgContext === null) {return -1;} else {
 					const texture = glFgContext.createTexture();
 					glFgContext.bindTexture(glFgContext.TEXTURE_2D, texture);
@@ -302,9 +348,9 @@
 					let colourArray = new Array();
 					let uvArray = new Array();
 					iconData.vertices.forEach(function(vertexObject){
-						verticesArray.push(vertexObject.shapes[0].x);
-						verticesArray.push(vertexObject.shapes[0].y);
-						verticesArray.push(vertexObject.shapes[0].z);
+						verticesArray.push(vertexObject.shapes[GlobalState.iconState.currentSubmodel].x);
+						verticesArray.push(vertexObject.shapes[GlobalState.iconState.currentSubmodel].y);
+						verticesArray.push(vertexObject.shapes[GlobalState.iconState.currentSubmodel].z);
 						colourArray.push(vertexObject.color.r/255);
 						colourArray.push(vertexObject.color.g/255);
 						colourArray.push(vertexObject.color.b/255);
@@ -340,7 +386,7 @@
 					// sets the angle uniform to 2/rotationDensity, this puts the icon at an angle.
 					// globalize uniform rotation
 					GlobalState.uniforms.rotation = uniforms.rotation;
-					GlobalState.rotations = 2;
+					if(clearData){GlobalState.rotations = 2;}
 					glFgContext.uniform1f(GlobalState.uniforms.rotation, GlobalState.rotations/rotationDensity);
 
 					//.section LIGHTING
@@ -350,7 +396,7 @@
 
 					//.section SCALING
 					GlobalState.uniforms.scale = uniforms.scale;
-					GlobalState.scale = 3.5;
+					if(clearData){GlobalState.scale = 3.5;}
 					glFgContext.uniform1f(GlobalState.uniforms.scale, GlobalState.scale);
 
 					//.section WRITE
@@ -392,6 +438,10 @@
 				iconbox.files[0].arrayBuffer().then(function(d){
 					try {
 						let output = readIconFile(d);
+						GlobalState.iconState.cachedIconSys = null;
+						GlobalState.iconState.source = null;
+						GlobalState.iconState.currentSubmodel = 0;
+						GlobalState.iconState.currentIcon = output;
 						renderIcon(output);
 						console.info("model data (ic*)",output);
 					} catch(e) {
@@ -415,6 +465,10 @@
 						Object.keys(output.filenames).forEach(function(file) {
 							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
 						});
+						GlobalState.iconState.cachedIconSys = output;
+						GlobalState.iconState.currentSubmodel = 0;
+						GlobalState.iconState.source = output2;
+						GlobalState.iconState.currentIcon = output2.n;
 						renderIcon(output2.n, output);
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
@@ -446,6 +500,10 @@
 							c: readIconFile(inputData.icons.c),
 							d: readIconFile(inputData.icons.d),
 						}
+						GlobalState.iconState.cachedIconSys = output;
+						GlobalState.iconState.currentSubmodel = 0;
+						GlobalState.iconState.source = icons;
+						GlobalState.iconState.currentIcon = icons.n;
 						renderIcon(icons.n, output);
 						let cTime = inputData.timestamps.created;
 						let mTime = inputData.timestamps.modified;
@@ -476,6 +534,10 @@
 						Object.keys(output.filenames).forEach(function(file) {
 							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
 						});
+						GlobalState.iconState.cachedIconSys = output;
+						GlobalState.iconState.currentSubmodel = 0;
+						GlobalState.iconState.source = output2;
+						GlobalState.iconState.currentIcon = output2.n;
 						renderIcon(output2.n, output);
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
@@ -567,12 +629,12 @@
 			document.getElementById("showExtractedInputOption").onchange = function(e) {
 				document.getElementById("advanced").style.display = ((e.target.checked) ? "block" : "none");
 			}
-			//todo: More than one model shape rendering, other 2 icons, Animation parsing, animation tweening
+			//todo: More than one model shape rendering, other 2 icons (technically done? NMW though), Animation parsing, animation tweening
 		</script>
 		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
 		<script>
 			document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;
-			document.getElementById("clientVersion").textContent = "0.6.4";
+			document.getElementById("clientVersion").textContent = "0.6.5";
 			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
 		</script>
 	</body>
