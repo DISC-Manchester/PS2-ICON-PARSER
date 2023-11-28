@@ -2,18 +2,37 @@
 //LOOKING FOR: LZARI implementation (for MAX), description of CBS compression (node zlib doesn't tackle it, even with RC4'ing the data)
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
-ICONJS_VERSION = "0.5.1";
+const ICONJS_VERSION = "0.5.2";
+if (typeof Window !== "undefined") {
+	window.ICONJS_VERSION = ICONJS_VERSION;
+}
 
+/**
+ * Enable or disable use of debugging information in console via console.debug()
+ * @param {boolean} value - Enable/disable this feature
+ * @default false
+ * @public
+ */
 function setDebug(value) {
 	ICONJS_DEBUG = !!value;
 }
 
+/**
+ * Select if invalid characters in titles should be replaced with either spaces or nulls
+ * @param {boolean} value - true: with nulls, false: with spaces
+ * @default true
+ * @deprecated unlikely to ever need this?
+ * @public
+ */
 function setStrictness(value) {
 	ICONJS_STRICT = !!value;
 }
 
-// where U = uncompressed, N = none, C = compressed
-
+/**
+ * Converts a texture format to a generalized texture type character.
+ * @param {number} input - texture format
+ * @returns {string} U: uncompressed, N: none, C: compressed
+ */
 function getTextureFormat(i) {
 	if (i<8) {
 		if(i==3) {
@@ -27,6 +46,12 @@ function getTextureFormat(i) {
 	}
 }
 
+/**
+ * Decompress a compressed texture using RLE.
+ * @param {ArrayBuffer} input - texture
+ * @returns {!Uint16Array} decompressed texture, equivalent to an uncompressed texture
+ * @public
+ */
 function uncompressTexture(texData) {
 	// for texture formats 8-15
 	if (texData.length & 1) {
@@ -66,6 +91,12 @@ function uncompressTexture(texData) {
 	return uncompressed;
 }
 
+/**
+ * Converts a BGR5A1 texture to a RGB5A1 texture
+ * @param {Uint16Array} bgrData - texture
+ * @returns {!Uint16Array} converted texture
+ * @public
+ */
 function convertBGR5A1toRGB5A1(bgrData) {
 	if(bgrData.byteLength !== 32768) {
 		throw `Not a 128x128x16 texture. (length was ${bgrData.length})`;
@@ -87,10 +118,21 @@ function convertBGR5A1toRGB5A1(bgrData) {
 	return converted;
 }
 
+/**
+ * Takes a string and returns the first part before a null character.
+ * @param {string} dirty - String to slice from first null character.
+ * @returns {string} Substring of dirty before first null character.
+ */
 function stringScrubber(dirty) {
 	return dirty.replaceAll("\x00","").substring(0, (dirty.indexOf("\x00") === -1) ? dirty.length : dirty.indexOf("\x00"));
 }
 
+/**
+ * Read a PS2D format file (icon.sys)
+ * @param {ArrayBuffer} input - icon.sys formatted file
+ * @returns {Object} (user didn't write a description)
+ * @public
+ */
 function readPS2D(input) {
 	const view = new DataView(input);
 	const u32le = function(i){return view.getUint32(i, 1)}
@@ -153,6 +195,12 @@ function readPS2D(input) {
 	return {filenames, title, background: {colors: bgColors, alpha: bgAlpha}, lighting: {points: lightIndices, colors: lightColors}};
 }
 
+/**
+ * Read a Model file ({*}, usually ICN or ICO, however)
+ * @param {ArrayBuffer} input - icon model file
+ * @returns {Object} (user didn't write a description)
+ * @public
+ */
 function readIconFile(input) {
 	//!pattern ps2icon-hacked.hexpat
 	const view = new DataView(input);
@@ -272,6 +320,12 @@ function readIconFile(input) {
 	return {numberOfShapes, vertices, textureFormat, texture, animData};
 }
 
+/**
+ * Read a 512-byte file descriptor that is used on Memory Cards or PSU files.
+ * @param {ArrayBuffer} input - File descriptor segment.
+ * @returns {Object} (user didn't write a description)
+ * @access protected
+ */
 function readEntryBlock(input) {
 	const view = new DataView(input);
 	const u32le = function(i){return view.getUint32(i, 1)};
@@ -312,6 +366,12 @@ function readEntryBlock(input) {
 	return {type, size, filename, createdTime, modifiedTime};
 }
 
+/**
+ * Read a EMS Memory Adapter export file (PSU format)
+ * @param {ArrayBuffer} input - PSU formatted file
+ * @returns {Object} (user didn't write a description)
+ * @public
+ */
 function readEmsPsuFile(input){
 	const header = readEntryBlock(input.slice(0,0x1ff));
 	if(header.size > 0x7f) {
@@ -352,6 +412,12 @@ function readEmsPsuFile(input){
 	return fsOut;
 }
 
+/**
+ * Read a PS3 save export file (PSV format)
+ * @param {ArrayBuffer} input - PSV formatted file
+ * @returns {Object} (user didn't write a description)
+ * @public
+ */
 function readPsvFile(input){
 	const view = new DataView(input);
 	const u32le = function(i){return view.getUint32(i, 1)};
@@ -409,6 +475,12 @@ function readPsvFile(input){
 	return {icons, "icon.sys": input.slice(ps2dOffset, ps2dOffset+ps2dSize), timestamps};
 }
 
+/**
+ * Read a SPS or XPS file descriptor.
+ * @param {ArrayBuffer} input - File descriptor segment.
+ * @returns {Object} (user didn't write a description)
+ * @access protected
+ */
 function readSxpsDescriptor(input) {
 	const view = new DataView(input);
 	const u32le = function(i){return view.getUint32(i, 1)};
@@ -454,6 +526,12 @@ function readSxpsDescriptor(input) {
 	return {type, size, filename, timestamps};
 }
 
+/**
+ * Read a SharkPort or X-Port export file (SPS or XPS format)
+ * @param {ArrayBuffer} input - SPS|XPS formatted file
+ * @returns {Object} (user didn't write a description)
+ * @public
+ */
 function readSharkXPortSxpsFile(input) {
 	const view = new DataView(input);
 	const u32le = function(i){return view.getUint32(i, 1)};
@@ -512,6 +590,7 @@ function readSharkXPortSxpsFile(input) {
 	return fsOut;
 }
 
+/** If we have a module object, define module.exports with all public functions */
 if(typeof module !== "undefined") {
 	// for C6JS
 	module.exports = {
