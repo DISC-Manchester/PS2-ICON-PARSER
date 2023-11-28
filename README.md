@@ -28,3 +28,11 @@ A JavaScript library (sorta) to read PS2 icons, and their related formats.
 
 ## Why "icondumper2"?
 Because it replaced what *was* left of icondumper (1).
+
+## Included files
+| File             | Description                               |
+| ----             | ----------------------------------------- |
+| icon.js          | The library itself.                       |
+| index.js         | Node.js example client.                   |
+| gltf-exporter.js | Node.js client to export icons to glTF 2. |
+| index.htm        | HTML reference client.                    |

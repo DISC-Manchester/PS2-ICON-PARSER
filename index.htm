@@ -19,6 +19,7 @@
 			#titlebox {width: 99%;position: absolute;}
 			input[type="file"] {line-height: 2em;}
 			#version {text-shadow: 1px 1px 2px black;}
+			a {color: #ccc;}
 		</style>
 		<meta data-comment="WebGL Shader: Icon">
 		<script type="text/plain" id="shader-icon-v">
@@ -631,9 +632,9 @@
 			}
 			//todo: More than one model shape rendering, other 2 icons (technically done? NMW though), Animation parsing, animation tweening
 		</script>
-		<span id="version">icondumper2 <span id="iconjsVersion">(unknown icon.js version)</span> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
+		<span id="version">icondumper2 <a href="./documentation" id="iconjsVersion">(unknown icon.js version)</a> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
 		<script>
-			document.getElementById("iconjsVersion").textContent = ICONJS_VERSION;
+			document.getElementById("iconjsVersion").textContent = exports.version;
 			document.getElementById("clientVersion").textContent = "0.6.5";
 			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
 		</script>

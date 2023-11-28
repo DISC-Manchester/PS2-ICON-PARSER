@@ -590,13 +590,14 @@ function readSharkXPortSxpsFile(input) {
 	return fsOut;
 }
 
-/** If we have a module object, define module.exports with all public functions */
+/** Define (module.)exports with all public functions */
+exports = {
+	readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile},
+	helpers: {uncompressTexture, convertBGR5A1toRGB5A1}, 
+	options: {setDebug, setStrictness},
+	version: ICONJS_VERSION
+};
+
 if(typeof module !== "undefined") {
-	// for C6JS
-	module.exports = {
-		readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile},
-		helpers: {uncompressTexture, convertBGR5A1toRGB5A1}, 
-		options: {setDebug, setStrictness},
-		version: ICONJS_VERSION
-	};
+	module.exports = exports;
 }
