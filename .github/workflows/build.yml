@@ -1,0 +1,22 @@
+name: "[icondumper2] autobuild"
+
+on: [push]
+
+jobs:
+  documentation:
+    name: Compile documentation via JSDoc
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@main
+      with:
+        fetch-depth: 0
+    - name: Install node.js
+      uses: actions/setup-node@main
+    - name: Compile documentation with JSDoc
+      run: npx jsdoc ./icon.js -d ./documentation -R ./README.md
+    - name: Upload Artifacts
+      uses: 'actions/upload-artifact@main'
+      with:
+        name: JSDoc-compiled Documentation
+        path: './documentation/*'

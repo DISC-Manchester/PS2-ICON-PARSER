@@ -15,7 +15,7 @@ const ICONJS_VERSION = "0.6.0";
  * @augments DataView
  * @constructor
  * @param {ArrayBuffer} buffer ArrayBuffer to base DataView from.
- * @returns {Object.<string, function>}
+ * @returns {Object.<string, function(number): number>}
  * @access protected
  */
 class yellowDataReader extends DataView {
@@ -33,7 +33,7 @@ class yellowDataReader extends DataView {
 	 * @param {number} i Indice offset.
 	 * @returns {number}
 	 */
-    u32le(i){return super.getUint32(i, 1)};
+	u32le(i){return super.getUint32(i, 1)};
 	/** Floating-point 32-bit, Little Endian.
 	 * @param {number} i Indice offset.
 	 * @returns {number}
@@ -87,7 +87,7 @@ function setStrictness(value) {
 
 /**
  * Converts a texture format to a generalized texture type character.
- * @param {number} input - texture format
+ * @param {number} i - texture format
  * @returns {string} U: uncompressed, N: none, C: compressed
  * @access protected
  */
