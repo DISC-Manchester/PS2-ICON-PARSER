@@ -13,3 +13,7 @@ icon.sys
 # Unused data
 
 tmp/*
+
+# Generated documentation
+
+documentation/*

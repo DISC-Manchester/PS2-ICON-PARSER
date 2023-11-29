@@ -2,9 +2,66 @@
 //LOOKING FOR: LZARI implementation (for MAX), description of CBS compression (node zlib doesn't tackle it, even with RC4'ing the data)
 ICONJS_DEBUG = false;
 ICONJS_STRICT = true;
-const ICONJS_VERSION = "0.5.2";
-if (typeof Window !== "undefined") {
-	window.ICONJS_VERSION = ICONJS_VERSION;
+
+/** 
+ * The current version of the library. 
+ * @constant {string}
+ * @default
+ */
+const ICONJS_VERSION = "0.6.0";
+
+/**
+ * Extension of DataView to add shortcuts for datatypes that I use often.
+ * @augments DataView
+ * @constructor
+ * @param {ArrayBuffer} buffer ArrayBuffer to base DataView from.
+ * @returns {Object.<string, function>}
+ * @access protected
+ */
+class yellowDataReader extends DataView {
+	/** Unsigned 16-bit, Little Endian.
+	 * @param {number} i Indice offset.
+	 * @returns {number}
+	 */
+	u16le(i){return super.getUint16(i, 1)};
+	/** Fixed-point 16-bit, Little Endian.
+	 * @param {number} i Indice offset.
+	 * @returns {number}
+	 */
+	f16le(i){return (super.getInt16(i, 1) / 4096)};
+	/** Unsigned 32-bit, Little Endian.
+	 * @param {number} i Indice offset.
+	 * @returns {number}
+	 */
+    u32le(i){return super.getUint32(i, 1)};
+	/** Floating-point 32-bit, Little Endian.
+	 * @param {number} i Indice offset.
+	 * @returns {number}
+	 */
+	f32le(i){return super.getFloat32(i, 1)};
+	/** 64-bit Timestamp structure, Little Endian.
+	 * Time returned is going to be offseted for JST (GMT+09:00).
+	 * @param {number} i Indice offset.
+	 * @returns {Object.<string, number>}
+	 */
+	t64le(i){return {
+		seconds: super.getUint8(i+1),
+		minutes: super.getUint8(i+2),
+		hours: super.getUint8(i+3),
+		day: super.getUint8(i+4),
+		month: super.getUint8(i+5),
+		year: super.getUint16(i+6, 1)
+	}};
+	constructor(buffer) {
+		super(buffer);
+		return {
+			u16le: this.u16le.bind(this),
+			f16le: this.f16le.bind(this),
+			u32le: this.u32le.bind(this),
+			f32le: this.f32le.bind(this),
+			t64le: this.t64le.bind(this)
+		}
+	}
 }
 
 /**
@@ -32,6 +89,7 @@ function setStrictness(value) {
  * Converts a texture format to a generalized texture type character.
  * @param {number} input - texture format
  * @returns {string} U: uncompressed, N: none, C: compressed
+ * @access protected
  */
 function getTextureFormat(i) {
 	if (i<8) {
@@ -57,8 +115,7 @@ function uncompressTexture(texData) {
 	if (texData.length & 1) {
 		throw "Texture size isn't a multiple of 2 (was ${texData.length})";
 	}
-	const view = new DataView(texData);
-	const u16le = function(i){return view.getUint16(i, 1)}
+	const {u16le} = new yellowDataReader(texData);
 	let uncompressed = new Uint16Array(16384);
 	let offset = 0;
 	for (let index = 0; index < 16384;) {
@@ -122,6 +179,7 @@ function convertBGR5A1toRGB5A1(bgrData) {
  * Takes a string and returns the first part before a null character.
  * @param {string} dirty - String to slice from first null character.
  * @returns {string} Substring of dirty before first null character.
+ * @access protected
  */
 function stringScrubber(dirty) {
 	return dirty.replaceAll("\x00","").substring(0, (dirty.indexOf("\x00") === -1) ? dirty.length : dirty.indexOf("\x00"));
@@ -134,9 +192,7 @@ function stringScrubber(dirty) {
  * @public
  */
 function readPS2D(input) {
-	const view = new DataView(input);
-	const u32le = function(i){return view.getUint32(i, 1)}
-	const f32le = function(i){return view.getFloat32(i, 1)}
+	const {u32le, f32le} = new yellowDataReader(input);
 	//!pattern ps2d.hexpat
 	const header = u32le(0);
 	if (header !== 0x44325350) {
@@ -203,10 +259,7 @@ function readPS2D(input) {
  */
 function readIconFile(input) {
 	//!pattern ps2icon-hacked.hexpat
-	const view = new DataView(input);
-	const u32le = function(i){return view.getUint32(i, 1)}
-	const f32le = function(i){return view.getFloat32(i, 1)}
-	const f16le = function(i){return (view.getInt16(i, 1) / 4096)}
+	const {u32le, f32le, f16le} = new yellowDataReader(input);
 	const u32_rgba8 =	function(i) {return {
 		r: (i & 0xff), 
 		g: ((i & 0xff00) >> 8), 
@@ -327,16 +380,7 @@ function readIconFile(input) {
  * @access protected
  */
 function readEntryBlock(input) {
-	const view = new DataView(input);
-	const u32le = function(i){return view.getUint32(i, 1)};
-	const t64le = function(i){return {
-		seconds: view.getUint8(i+1),
-		minutes: view.getUint8(i+2),
-		hours: view.getUint8(i+3),
-		day: view.getUint8(i+4),
-		month: view.getUint8(i+5),
-		year: view.getUint16(i+6, 1)
-	}}; //NOTE: times are in JST timezone (GMT+09:00), so clients should implement correctly!
+	const {u32le, t64le} = new yellowDataReader(input);
 	//!pattern psu_file.hexpat
 	const permissions = u32le(0);
 	let type;
@@ -419,16 +463,7 @@ function readEmsPsuFile(input){
  * @public
  */
 function readPsvFile(input){
-	const view = new DataView(input);
-	const u32le = function(i){return view.getUint32(i, 1)};
-	const t64le = function(i){return {
-		seconds: view.getUint8(i+1),
-		minutes: view.getUint8(i+2),
-		hours: view.getUint8(i+3),
-		day: view.getUint8(i+4),
-		month: view.getUint8(i+5),
-		year: view.getUint16(i+6, 1)
-	}};
+	const {u32le, t64le} = new yellowDataReader(input);
 	//!pattern psv_file.hexpat
 	const magic = u32le(0);
 	if (magic !== 0x50535600) {
@@ -482,16 +517,7 @@ function readPsvFile(input){
  * @access protected
  */
 function readSxpsDescriptor(input) {
-	const view = new DataView(input);
-	const u32le = function(i){return view.getUint32(i, 1)};
-	const t64le = function(i){return {
-		seconds: view.getUint8(i+1),
-		minutes: view.getUint8(i+2),
-		hours: view.getUint8(i+3),
-		day: view.getUint8(i+4),
-		month: view.getUint8(i+5),
-		year: view.getUint16(i+6, 1)
-	}}; //NOTE: times are in JST timezone (GMT+09:00), so clients should implement correctly!
+	const {u32le, t64le} = new yellowDataReader(input);
 	//!pattern sps-xps_file.hexpat
 	//:skip 2 // ... it's the file descriptor block size (including the bytes themselves, so 250)
 	const int_filename = input.slice(2, 66);
@@ -533,8 +559,7 @@ function readSxpsDescriptor(input) {
  * @public
  */
 function readSharkXPortSxpsFile(input) {
-	const view = new DataView(input);
-	const u32le = function(i){return view.getUint32(i, 1)};
+	const {u32le} = new yellowDataReader(input);
 	//!pattern sps-xps_file.hexpat
 	const identLength = u32le(0);
 	if(identLength !== 13) {
@@ -590,7 +615,10 @@ function readSharkXPortSxpsFile(input) {
 	return fsOut;
 }
 
-/** Define (module.)exports with all public functions */
+/** 
+ * Define (module.)exports with all public functions
+ * @exports icondumper2/icon
+ */
 exports = {
 	readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile},
 	helpers: {uncompressTexture, convertBGR5A1toRGB5A1}, 
