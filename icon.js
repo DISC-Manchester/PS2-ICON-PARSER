@@ -8,7 +8,7 @@ ICONJS_STRICT = true;
  * @constant {string}
  * @default
  */
-const ICONJS_VERSION = "0.6.0";
+const ICONJS_VERSION = "0.6.1";
 
 /**
  * Extension of DataView to add shortcuts for datatypes that I use often.
@@ -576,10 +576,21 @@ function readSharkXPortSxpsFile(input) {
 	offset += (titleLength + 4);
 	const descriptionLength = u32le(offset);
 	const description = input.slice(offset + 4, (offset + 4) + descriptionLength);
-	offset += (descriptionLength + 8);
+	offset += (descriptionLength + 4);
+	const description2Length = u32le(offset);
+	let description2;
+	if(description2Length !== 0) {
+		description2 = input.slice(offset + 4, (offset + 4) + description2Length);
+		offset += (description2Length + 4);
+	} else {
+		offset += 4;
+	}
 	const comments = {
 		"game": stringScrubber((new TextDecoder("utf-8")).decode(title)),
 		"name": stringScrubber((new TextDecoder("utf-8")).decode(description))
+	}
+	if(description2Length !== 0) {
+		comments.desc = stringScrubber((new TextDecoder("utf-8")).decode(description2));
 	}
 	const totalSize = u32le(offset);
 	offset += 4;

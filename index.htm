@@ -148,7 +148,7 @@
 			<span>Date&nbsp;modified: </span><span id="dateModified">--:--:--&nbsp;--/--/----</span><span> UTC+09:00</span>
 		</p>
 		<p>
-			<span>File comments: </span><span id="fileCommentGame">(no title)</span></span><span> - </span><span id="fileCommentName">(no description)</span>
+			<span>File comments: </span><span id="fileCommentGame">(no title)</span><span> - </span><span id="fileCommentName">(no description)</span><span> - </span><span id="fileCommentDesc">(no other text)</span>
 		</p>
 		<script>
 			// I usually don't do in-body <script>'s, but I didn't want to do an await onload() again
@@ -271,6 +271,7 @@
 				document.getElementById("dateModified").textContent = "--:--:-- --/--/----";
 				document.getElementById("fileCommentGame").textContent = "(no title)";
 				document.getElementById("fileCommentName").textContent = "(no description)";
+				document.getElementById("fileCommentDesc").textContent = "(no other text)";
 				//reset globalstate parameters
 				GlobalState.iconState.cachedIconSys = null;
 				GlobalState.iconState.currentIcon = null;
@@ -547,6 +548,9 @@
 						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
 						document.getElementById("fileCommentGame").textContent = vFilesystem.comments.game;
 						document.getElementById("fileCommentName").textContent = vFilesystem.comments.name;
+						if(vFilesystem.comments.hasOwnProperty("desc")) {
+							document.getElementById("fileCommentDesc").textContent = vFilesystem.comments.desc;
+						}
 						console.info("model files (*ps)", output2);
 						console.info("icon.sys (*ps)", output);
 					} catch(e) {
@@ -635,7 +639,7 @@
 		<span id="version">icondumper2 <a href="./documentation" id="iconjsVersion">(unknown icon.js version)</a> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
 		<script>
 			document.getElementById("iconjsVersion").textContent = exports.version;
-			document.getElementById("clientVersion").textContent = "0.6.5";
+			document.getElementById("clientVersion").textContent = "0.6.6";
 			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
 		</script>
 	</body>

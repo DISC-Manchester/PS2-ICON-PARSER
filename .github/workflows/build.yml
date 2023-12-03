@@ -16,7 +16,7 @@ jobs:
     - name: Compile documentation with JSDoc
       run: npx jsdoc ./icon.js -d ./documentation -R ./README.md
     - name: Upload Artifacts
-      uses: 'actions/upload-artifact@main'
+      uses: actions/upload-artifact@main
       with:
         name: JSDoc-compiled Documentation
         path: './documentation/*'

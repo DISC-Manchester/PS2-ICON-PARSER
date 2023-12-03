@@ -9,6 +9,9 @@ icon.sys
 *.psv
 *.xps
 *.sps
+*.npo
+*.p2m
+*.md
 
 # Unused data
 
