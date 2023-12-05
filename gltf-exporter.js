@@ -249,7 +249,7 @@ function loadAndConvertIcon(inputData, attemptedFilename = "-") {
 	if (inputData.hasOwnProperty("numberOfShapes") === false) {
 		throw "Expected a icondumper2 Intermediate Model Format object.";
 	}
-	const filename = encodeURIComponent(attemptedFilename).replaceAll(/\%[0-9A-F]{2,2}/g, "").replaceAll(".", "_");
+	const filename = encodeURIComponent(attemptedFilename).replace(/\%[0-9A-F]{2,2}/g, "").replace(/\./g, "_");
 	const glTF_output = imf2gltf(inputData, filename);
 	for (let index = 0; index < (inputData.numberOfShapes); index++) {
 		(require("fs")).writeFileSync(`${filename}_${index}.gltf`, new TextEncoder().encode(JSON.stringify(glTF_output.objects[index])));

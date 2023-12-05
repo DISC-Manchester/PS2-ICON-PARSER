@@ -1,21 +1,22 @@
 //todo: Make this a module/mjs file. C6 compatibility can stay, if needed.
 //LOOKING FOR: LZARI implementation (for MAX), description of CBS compression (node zlib doesn't tackle it, even with RC4'ing the data)
-ICONJS_DEBUG = false;
-ICONJS_STRICT = true;
+var ICONJS_DEBUG = false;
+var ICONJS_STRICT = true;
 
 /** 
  * The current version of the library. 
  * @constant {string}
  * @default
  */
-const ICONJS_VERSION = "0.6.1";
+const ICONJS_VERSION = "0.6.1+u1";
 
 /**
  * Extension of DataView to add shortcuts for datatypes that I use often.
  * @augments DataView
  * @constructor
  * @param {ArrayBuffer} buffer ArrayBuffer to base DataView from.
- * @returns {Object.<string, function(number): number>}
+ * @returns {Object.<string, function(number): number>} [u16le, f16le, u32le, f32le]
+ * @returns {Object.<string, function(number): Object.<string.number>>} [t64le]
  * @access protected
  */
 class yellowDataReader extends DataView {
@@ -40,9 +41,16 @@ class yellowDataReader extends DataView {
 	 */
 	f32le(i){return super.getFloat32(i, 1)};
 	/** 64-bit Timestamp structure, Little Endian.
+	 * Time returned is set for JST (UTC+09:00) instead of UTC.
 	 * Time returned is going to be offseted for JST (GMT+09:00).
 	 * @param {number} i Indice offset.
 	 * @returns {Object.<string, number>}
+	 * @property {number} seconds - Seconds.
+	 * @property {number} minutes - Minutes.
+	 * @property {number} hours - Hours.
+	 * @property {number} day - Day.
+	 * @property {number} month - Month.
+	 * @property {number} year - Year.
 	 */
 	t64le(i){return {
 		seconds: super.getUint8(i+1),
@@ -78,7 +86,7 @@ function setDebug(value) {
  * Select if invalid characters in titles should be replaced with either spaces or nulls
  * @param {boolean} value - true: with nulls, false: with spaces
  * @default true
- * @deprecated unlikely to ever need this?
+ * @deprecated Hasn't been needed for a while. Dropping support by ESM transition.
  * @public
  */
 function setStrictness(value) {
@@ -182,7 +190,7 @@ function convertBGR5A1toRGB5A1(bgrData) {
  * @access protected
  */
 function stringScrubber(dirty) {
-	return dirty.replaceAll("\x00","").substring(0, (dirty.indexOf("\x00") === -1) ? dirty.length : dirty.indexOf("\x00"));
+	return dirty.replace(/\0/g, "").substring(0, (dirty.indexOf("\x00") === -1) ? dirty.length : dirty.indexOf("\x00"));
 }
 
 /**
@@ -627,9 +635,9 @@ function readSharkXPortSxpsFile(input) {
 }
 
 /** 
- * Define (module.)exports with all public functions
+ * Define (module.)exports with all public functions.
  * @exports icondumper2/icon
- */
+ */ // start c6js
 exports = {
 	readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile},
 	helpers: {uncompressTexture, convertBGR5A1toRGB5A1}, 
@@ -640,3 +648,9 @@ exports = {
 if(typeof module !== "undefined") {
 	module.exports = exports;
 }
+//end c6js
+//start esm
+/*export {
+	readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, uncompressTexture, convertBGR5A1toRGB5A1, setDebug, ICONJS_VERSION
+};*/
+//end esm

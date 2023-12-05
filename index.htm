@@ -20,6 +20,13 @@
 			input[type="file"] {line-height: 2em;}
 			#version {text-shadow: 1px 1px 2px black;}
 			a {color: #ccc;}
+			.inputbox {
+				display: inline-grid;
+				margin-right: 0.25em;
+				border: 1px gray solid;
+				padding: 0.175em 0.25em 0 0.25em;
+				margin-bottom: 4px;
+			}
 		</style>
 		<meta data-comment="WebGL Shader: Icon">
 		<script type="text/plain" id="shader-icon-v">
@@ -133,15 +140,18 @@
 			<br>
 		</div>
 		<hr>
-		<label for="psuinput">EMS Memory Adapter export file (.psu) goes here:</label>
-		<input type="file" id="psuinput" name="psuinput" accept=".psu" />
-		<br>
-		<label for="psvinput">PS3 export file (.psv) goes here:</label>
-		<input type="file" id="psvinput" name="psvinput" accept=".psv" />
-		<br>
-		<label for="spsinput">SharkPort/X-Port export file (.sps, .xps) goes here:</label>
-		<input type="file" id="spsinput" name="spsinput" accept=".sps, .xps" />
-		<br>
+		<div class="inputbox">
+			<label for="psuinput">EMS Memory Adapter export file (.psu) goes here:</label>
+			<input type="file" id="psuinput" name="psuinput" accept=".psu" />
+		</div>
+		<div class="inputbox">
+			<label for="psvinput">PS3 export file (.psv) goes here:</label>
+			<input type="file" id="psvinput" name="psvinput" accept=".psv" />
+		</div>
+		<div class="inputbox">
+			<label for="spsinput">SharkPort/X-Port export file (.sps, .xps) goes here:</label>
+			<input type="file" id="spsinput" name="spsinput" accept=".sps, .xps" />
+		</div>
 		<p>
 			<span>Date&nbsp;created: </span><span id="dateCreated">--:--:--&nbsp;--/--/----</span><span> UTC+09:00</span>
 			<wbr><span>&ndash;</span>
@@ -152,16 +162,19 @@
 		</p>
 		<script>
 			// I usually don't do in-body <script>'s, but I didn't want to do an await onload() again
-			const GlobalState = {rotations: 2, dataLength: 0, uniforms: {rotation: null, scale: null}, iconState: {source: null, currentIcon: null, currentSubmodel: 0, cachedIconSys: null}};
+			const GlobalState = {rotations: 2, dataLength: 0, uniforms: {rotation: null, scale: null}, iconState: {source: null, currentIcon: null, currentSubmodel: 0, cachedIconSys: null}, fileReader: (new FileReader)};
 			// I don't care HOW disgusting doing this is, I'm sick of pressing escape to clear these.
 			let allInputs = document.querySelectorAll('input[type="file"]');
-			allInputs.forEach(
+			Array.from(allInputs).forEach(
 				function(nodeObject) {
 					nodeObject.onclick = function() {
-						allInputs.forEach(function(elementObject) {elementObject.value = null;});
+						Array.from(allInputs).forEach(function(elementObject) {elementObject.value = null;});
 					}
 				}
 			);
+			function p0in(input) { // "prefix 0 if needed"
+				return ((input.length>=2) ? input : `0${input}`);
+			};
 			// rotation stuff
 			const rotationDensity = 60;
 			document.body.onkeydown = function(ev) {
@@ -394,7 +407,7 @@
 					//.section LIGHTING
 					let colours = fileMetadata.lighting.colors[0];
 					//glFgContext.uniform3f(uniforms.ambientLighting, colours.r, colours.g, colours.b);
-					glFgContext.uniform3f(uniforms.ambientLighting, 1, 1, 1);
+					glFgContext.uniform3f(uniforms.ambientLighting, 0.75, 0.75, 0.75);
 
 					//.section SCALING
 					GlobalState.uniforms.scale = uniforms.scale;
@@ -421,25 +434,30 @@
 				if(filebox.files.length === 0) {
 					return;
 				}
-				filebox.files[0].arrayBuffer().then(function(d){
+				GlobalState.fileReader.readAsArrayBuffer(filebox.files[0]);
+				GlobalState.fileReader.onloadend = function() {
+					GlobalState.fileReader.onloadend = void(0);
 					try {
-						let output = readPS2D(d);
+						let output = readPS2D(GlobalState.fileReader.result);
 						console.info("icon.sys", output);
 						updateDisplay(output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
+						console.error(e);
 						alert(e);
 					}
-				});
+				}
 			}
 			iconbox = document.getElementById("icon");
 			iconbox.onchange = function(e) {
 				if(iconbox.files.length === 0) {
 					return;
 				}
-				iconbox.files[0].arrayBuffer().then(function(d){
+				GlobalState.fileReader.readAsArrayBuffer(iconbox.files[0]);
+				GlobalState.fileReader.onloadend = function() {
+					GlobalState.fileReader.onloadend = void(0);
 					try {
-						let output = readIconFile(d);
+						let output = readIconFile(GlobalState.fileReader.result);
 						GlobalState.iconState.cachedIconSys = null;
 						GlobalState.iconState.source = null;
 						GlobalState.iconState.currentSubmodel = 0;
@@ -448,9 +466,10 @@
 						console.info("model data (ic*)",output);
 					} catch(e) {
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
+						console.error(e);
 						alert(e);
 					}
-				});
+				}
 			}
 			psubox = document.getElementById("psuinput");
 			psubox.onchange = function(e) {
@@ -458,9 +477,11 @@
 				if(psubox.files.length === 0) {
 					return;
 				}
-				psubox.files[0].arrayBuffer().then(function(d){
+				GlobalState.fileReader.readAsArrayBuffer(psubox.files[0]);
+				GlobalState.fileReader.onloadend = function() {
+					GlobalState.fileReader.onloadend = void(0);
 					try {
-						let vFilesystem = readEmsPsuFile(d);
+						let vFilesystem = readEmsPsuFile(GlobalState.fileReader.result);
 						let output = readPS2D(vFilesystem[vFilesystem.rootDirectory]["icon.sys"].data);
 						updateDisplay(output);
 						let output2 = new Object();
@@ -475,16 +496,17 @@
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
-						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
-						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
+						document.getElementById("dateCreated").textContent = `${p0in(cTime.hours.toString())}:${p0in(cTime.minutes.toString())}:${p0in(cTime.seconds.toString())} ${p0in(cTime.day.toString())}/${p0in(cTime.month.toString())}/${cTime.year}`;
+						document.getElementById("dateModified").textContent = `${p0in(mTime.hours.toString())}:${p0in(mTime.minutes.toString())}:${p0in(mTime.seconds.toString())} ${p0in(mTime.day.toString())}/${p0in(mTime.month.toString())}/${mTime.year}`;
 						console.info("model files (psu)", output2);
 						console.info("icon.sys (psu)", output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
+						console.error(e);
 						alert(e);
 					}
-				});
+				}
 			}
 			psvbox = document.getElementById("psvinput");
 			psvbox.onchange = function(e) {
@@ -492,9 +514,11 @@
 				if(psvbox.files.length === 0) {
 					return;
 				}
-				psvbox.files[0].arrayBuffer().then(function(d){
+				GlobalState.fileReader.readAsArrayBuffer(psvbox.files[0]);
+				GlobalState.fileReader.onloadend = function() {
+					GlobalState.fileReader.onloadend = void(0);
 					try {
-						let inputData = readPsvFile(d);
+						let inputData = readPsvFile(GlobalState.fileReader.result);
 						let output = readPS2D(inputData["icon.sys"]);
 						updateDisplay(output);
 						const icons = {
@@ -510,16 +534,17 @@
 						let cTime = inputData.timestamps.created;
 						let mTime = inputData.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
-						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
-						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
+						document.getElementById("dateCreated").textContent = `${p0in(cTime.hours.toString())}:${p0in(cTime.minutes.toString())}:${p0in(cTime.seconds.toString())} ${p0in(cTime.day.toString())}/${p0in(cTime.month.toString())}/${cTime.year}`;
+						document.getElementById("dateModified").textContent = `${p0in(mTime.hours.toString())}:${p0in(mTime.minutes.toString())}:${p0in(mTime.seconds.toString())} ${p0in(mTime.day.toString())}/${p0in(mTime.month.toString())}/${mTime.year}`;
 						console.info("model files (psv)", icons);
 						console.info("icon.sys (psv)", output);
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
+						console.error(e);
 						alert(e);
 					}
-				});
+				}
 			}
 			spsbox = document.getElementById("spsinput");
 			spsbox.onchange = function(e) {
@@ -527,9 +552,11 @@
 				if(spsbox.files.length === 0) {
 					return;
 				}
-				spsbox.files[0].arrayBuffer().then(function(d){
+				GlobalState.fileReader.readAsArrayBuffer(spsbox.files[0]);
+				GlobalState.fileReader.onloadend = function() {
+					GlobalState.fileReader.onloadend = void(0);
 					try {
-						let vFilesystem = readSharkXPortSxpsFile(d);
+						let vFilesystem = readSharkXPortSxpsFile(GlobalState.fileReader.result);
 						let output = readPS2D(vFilesystem[vFilesystem.rootDirectory]["icon.sys"].data);
 						updateDisplay(output);
 						let output2 = new Object();
@@ -544,8 +571,8 @@
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
 						//TODO: use Time() to align JST times to user-local timezone
-						document.getElementById("dateCreated").textContent = `${cTime.hours.toString().padStart("2","0")}:${cTime.minutes.toString().padStart("2","0")}:${cTime.seconds.toString().padStart("2","0")} ${cTime.day.toString().padStart("2","0")}/${cTime.month.toString().padStart("2","0")}/${cTime.year}`;
-						document.getElementById("dateModified").textContent = `${mTime.hours.toString().padStart("2","0")}:${mTime.minutes.toString().padStart("2","0")}:${mTime.seconds.toString().padStart("2","0")} ${mTime.day.toString().padStart("2","0")}/${mTime.month.toString().padStart("2","0")}/${mTime.year}`;
+						document.getElementById("dateCreated").textContent = `${p0in(cTime.hours.toString())}:${p0in(cTime.minutes.toString())}:${p0in(cTime.seconds.toString())} ${p0in(cTime.day.toString())}/${p0in(cTime.month.toString())}/${cTime.year}`;
+						document.getElementById("dateModified").textContent = `${p0in(mTime.hours.toString())}:${p0in(mTime.minutes.toString())}:${p0in(mTime.seconds.toString())} ${p0in(mTime.day.toString())}/${p0in(mTime.month.toString())}/${mTime.year}`;
 						document.getElementById("fileCommentGame").textContent = vFilesystem.comments.game;
 						document.getElementById("fileCommentName").textContent = vFilesystem.comments.name;
 						if(vFilesystem.comments.hasOwnProperty("desc")) {
@@ -556,9 +583,10 @@
 					} catch(e) {
 						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
 						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
+						console.error(e);
 						alert(e);
 					}
-				});
+				};
 			}
 			function createShader(gl, type, source) {
 				let shader = gl.createShader(type);
@@ -639,7 +667,7 @@
 		<span id="version">icondumper2 <a href="./documentation" id="iconjsVersion">(unknown icon.js version)</a> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
 		<script>
 			document.getElementById("iconjsVersion").textContent = exports.version;
-			document.getElementById("clientVersion").textContent = "0.6.6";
+			document.getElementById("clientVersion").textContent = "0.6.7";
 			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
 		</script>
 	</body>
