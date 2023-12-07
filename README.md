@@ -19,6 +19,7 @@ As of writing, there was no exporter that exists for the format that exhibited o
 * PS3 virtual memory card export files (.psv)
 * SharkPort export files (.sps)
 * X-Port export files (.xps)
+* CodeBreaker Save export files (.cbs)
 * PS2 icons (.ico, .icn)
 * PS2D format (icon.sys)
 

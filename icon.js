@@ -1,5 +1,5 @@
-//todo: Make this a module/mjs file. C6 compatibility can stay, if needed.
-//LOOKING FOR: LZARI implementation (for MAX), description of CBS compression (node zlib doesn't tackle it, even with RC4'ing the data)
+//To swap between mjs/esm and c6js, go to the end of this file, and (un)comment your wanted module mode.
+//LOOKING FOR: LZARI implementation (for MAX and PWS files. THIS WILL COMPLETE ICONDUMPER2.)
 var ICONJS_DEBUG = false;
 var ICONJS_STRICT = true;
 
@@ -8,15 +8,54 @@ var ICONJS_STRICT = true;
  * @constant {string}
  * @default
  */
-const ICONJS_VERSION = "0.6.1+u1";
+const ICONJS_VERSION = "0.7.0";
+
+/**
+ * The RC4 key used for ciphering CodeBreaker Saves.
+ * @constant {Uint8Array}
+ */
+const ICONJS_CBS_RC4_KEY = new Uint8Array([
+	0x5f, 0x1f, 0x85, 0x6f, 0x31, 0xaa, 0x3b, 0x18,
+	0x21, 0xb9, 0xce, 0x1c, 0x07, 0x4c, 0x9c, 0xb4,
+	0x81, 0xb8, 0xef, 0x98, 0x59, 0xae, 0xf9, 0x26,
+	0xe3, 0x80, 0xa3, 0x29, 0x2d, 0x73, 0x51, 0x62,
+	0x7c, 0x64, 0x46, 0xf4, 0x34, 0x1a, 0xf6, 0xe1,
+	0xba, 0x3a, 0x0d, 0x82, 0x79, 0x0a, 0x5c, 0x16,
+	0x71, 0x49, 0x8e, 0xac, 0x8c, 0x9f, 0x35, 0x19,
+	0x45, 0x94, 0x3f, 0x56, 0x0c, 0x91, 0x00, 0x0b,
+	0xd7, 0xb0, 0xdd, 0x39, 0x66, 0xa1, 0x76, 0x52,
+	0x13, 0x57, 0xf3, 0xbb, 0x4e, 0xe5, 0xdc, 0xf0,
+	0x65, 0x84, 0xb2, 0xd6, 0xdf, 0x15, 0x3c, 0x63,
+	0x1d, 0x89, 0x14, 0xbd, 0xd2, 0x36, 0xfe, 0xb1,
+	0xca, 0x8b, 0xa4, 0xc6, 0x9e, 0x67, 0x47, 0x37,
+	0x42, 0x6d, 0x6a, 0x03, 0x92, 0x70, 0x05, 0x7d,
+	0x96, 0x2f, 0x40, 0x90, 0xc4, 0xf1, 0x3e, 0x3d,
+	0x01, 0xf7, 0x68, 0x1e, 0xc3, 0xfc, 0x72, 0xb5,
+	0x54, 0xcf, 0xe7, 0x41, 0xe4, 0x4d, 0x83, 0x55,
+	0x12, 0x22, 0x09, 0x78, 0xfa, 0xde, 0xa7, 0x06,
+	0x08, 0x23, 0xbf, 0x0f, 0xcc, 0xc1, 0x97, 0x61,
+	0xc5, 0x4a, 0xe6, 0xa0, 0x11, 0xc2, 0xea, 0x74,
+	0x02, 0x87, 0xd5, 0xd1, 0x9d, 0xb7, 0x7e, 0x38,
+	0x60, 0x53, 0x95, 0x8d, 0x25, 0x77, 0x10, 0x5e,
+	0x9b, 0x7f, 0xd8, 0x6e, 0xda, 0xa2, 0x2e, 0x20,
+	0x4f, 0xcd, 0x8f, 0xcb, 0xbe, 0x5a, 0xe0, 0xed,
+	0x2c, 0x9a, 0xd4, 0xe2, 0xaf, 0xd0, 0xa9, 0xe8,
+	0xad, 0x7a, 0xbc, 0xa8, 0xf2, 0xee, 0xeb, 0xf5,
+	0xa6, 0x99, 0x28, 0x24, 0x6c, 0x2b, 0x75, 0x5d,
+	0xf8, 0xd3, 0x86, 0x17, 0xfb, 0xc0, 0x7b, 0xb3,
+	0x58, 0xdb, 0xc7, 0x4b, 0xff, 0x04, 0x50, 0xe9,
+	0x88, 0x69, 0xc9, 0x2a, 0xab, 0xfd, 0x5b, 0x1b,
+	0x8a, 0xd9, 0xec, 0x27, 0x44, 0x0e, 0x33, 0xc8,
+	0x6b, 0x93, 0x32, 0x48, 0xb6, 0x30, 0x43, 0xa5
+]);
 
 /**
  * Extension of DataView to add shortcuts for datatypes that I use often.
  * @augments DataView
  * @constructor
  * @param {ArrayBuffer} buffer ArrayBuffer to base DataView from.
- * @returns {Object.<string, function(number): number>} [u16le, f16le, u32le, f32le]
- * @returns {Object.<string, function(number): Object.<string.number>>} [t64le]
+ * @returns {!Object.<string, function(number): number>} [u16le, f16le, u32le, f32le]
+ * @returns {!Object.<string, function(number): Object.<string.number>>} [t64le]
  * @access protected
  */
 class yellowDataReader extends DataView {
@@ -70,6 +109,29 @@ class yellowDataReader extends DataView {
 			t64le: this.t64le.bind(this)
 		}
 	}
+}
+
+/**
+ * Implements an RC4 cipher.
+ * @param {TypedArray|Uint8Array} key - 256-byte key
+ * @param {TypedArray|Uint8Array} target - n-length data to cipher
+ * @returns {!Uint8Array} target ciphered by key
+ * @access protected
+ */
+function rc4Cipher(key, target) {
+	//todo: support keys that aren't exactly 256-bytes long
+	let myNewKey = new Uint8Array(key);
+	let deciphered = new Uint8Array(target);
+	let temp = 0;
+	for (let index = 0; index < target.length; index++) {
+		let indice = (index + 1) % 256;
+		temp = (temp + myNewKey[indice]) % 256;
+		let backup = myNewKey[indice];
+		myNewKey[indice] = myNewKey[temp];
+		myNewKey[temp] = backup;
+		deciphered[index] ^= myNewKey[(myNewKey[indice] + myNewKey[temp]) % 256];
+	}
+	return deciphered;
 }
 
 /**
@@ -268,7 +330,7 @@ function readPS2D(input) {
 function readIconFile(input) {
 	//!pattern ps2icon-hacked.hexpat
 	const {u32le, f32le, f16le} = new yellowDataReader(input);
-	const u32_rgba8 =	function(i) {return {
+	const u32_rgba8 = function(i) {return {
 		r: (i & 0xff), 
 		g: ((i & 0xff00) >> 8), 
 		b: ((i & 0xff0000) >> 16), 
@@ -405,17 +467,16 @@ function readEntryBlock(input) {
 		throw `I don't parse portable applications or legacy save data. (${permissions} has bits 10 or 11 set)`;
 	}
 	const size = u32le(4);
-	const createdTime = t64le(8);
 	const sectorOffset = u32le(16);
 	const dirEntry = u32le(20);
-	const modifiedTime = t64le(24);
+	const timestamps = {created: t64le(8), modified: t64le(24)};
 	const specialSection = input.slice(0x20, 0x40);
 	const int_filename = input.slice(0x40, 512); 
 	const filename = stringScrubber((new TextDecoder("utf-8")).decode(int_filename));
 	if(ICONJS_DEBUG){
-		console.debug({permissions, type, size, createdTime, sectorOffset, dirEntry, modifiedTime, specialSection, filename});
+		console.debug({permissions, type, size, sectorOffset, dirEntry, timestamps, specialSection, filename});
 	}
-	return {type, size, filename, createdTime, modifiedTime};
+	return {type, size, filename, timestamps};
 }
 
 /**
@@ -429,7 +490,7 @@ function readEmsPsuFile(input){
 	if(header.size > 0x7f) {
 		throw `Directory is too large! (maximum size: ${0x7f}, was ${header.size})`
 	}
-	let fsOut = {length: header.size, rootDirectory: header.filename, timestamps: {created: header.createdTime, modified: header.modifiedTime}};
+	let fsOut = {length: header.size, rootDirectory: header.filename, timestamps: header.timestamps};
 	let output = new Object();
 	let offset = 512;
 	for (let index = 0; index < header.size; index++) {
@@ -634,12 +695,76 @@ function readSharkXPortSxpsFile(input) {
 	return fsOut;
 }
 
+/**
+ * Read a CodeBreaker Save (CBS) file's directory structure
+ * @param {ArrayBuffer} input - Uncompressed, unciphered input
+ * @returns {Object} (user didn't write a description)
+ * @protected
+ */
+function readCodeBreakerCbsDirectory(input) {
+	const {u32le, t64le} = new yellowDataReader(input);
+	const virtualFilesystem = new Object();
+	for (let offset = 0; offset < input.byteLength;) {
+		const timestamps = {created: t64le(offset), modified: t64le(offset+8)};
+		const dataSize = u32le(offset+16);
+		const permissions = u32le(offset+20);
+		offset += 32;
+		const _filename = input.slice(offset, offset+32);
+		const filename = stringScrubber((new TextDecoder("utf-8")).decode(_filename));
+		offset += 32;
+		const data = input.slice(offset, offset+dataSize);
+		offset += dataSize;
+		virtualFilesystem[filename] = ({timestamps, dataSize, permissions, data});
+	}
+	return virtualFilesystem;
+}
+
+/**
+ * Read a CodeBreaker Save (CBS) file.
+ * @param {ArrayBuffer} input - CBS formatted file
+ * @param {function(Uint8Array): ArrayBuffer} inflator - a function which provides a zlib-compatible inflate function.
+ * @returns {Object} (user didn't write a description)
+ * @public
+ */
+function readCodeBreakerCbsFile(input, inflator = null) {
+	if(typeof inflator !== "function") {
+		throw `No inflator function passed. Skipping.`;
+	}
+	const {u32le, t64le} = new yellowDataReader(input);
+	const magic = u32le(0);
+	if (magic !== 0x00554643) {
+		throw `Not a CodeBreaker Save (CBS) file (was ${magic}, expected ${0x00554643})`;
+	}
+	//u32le(4); something? it's always 8000
+	const dataOffset = u32le(8);
+	//const uncompressedSize = u32le(12);
+	const compressedSize = u32le(16);
+	const _dirName = input.slice(20, 52);
+	const dirName = stringScrubber((new TextDecoder("utf-8")).decode(_dirName));
+	const timestamps = {created: t64le(52), modified: t64le(60)};
+	const permissions = u32le(72);
+	if (permissions>0xffff) {
+		throw `Not a valid export file (was ${permissions}, expected less than ${0xffff})`;
+	}
+	if((permissions & 0b0001100000000000)>=1){
+		throw `I don't parse portable applications or legacy save data. (${permissions} has bits 10 or 11 set)`;
+	}
+	const _displayName = input.slice(92, 296);
+	const displayName = stringScrubber((new TextDecoder("utf-8")).decode(_displayName));
+	const compressedData = input.slice(dataOffset, dataOffset + compressedSize);
+	const decipheredData = rc4Cipher(ICONJS_CBS_RC4_KEY, new Uint8Array(compressedData));
+	const inflatedData = inflator(decipheredData);
+	const fsOut = {rootDirectory: dirName, timestamps};
+	fsOut[dirName] = readCodeBreakerCbsDirectory(inflatedData);
+	return fsOut;
+}
+
 /** 
  * Define (module.)exports with all public functions.
  * @exports icondumper2/icon
  */ // start c6js
 exports = {
-	readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile},
+	readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, readCodeBreakerCbsFile},
 	helpers: {uncompressTexture, convertBGR5A1toRGB5A1}, 
 	options: {setDebug, setStrictness},
 	version: ICONJS_VERSION
@@ -651,6 +776,6 @@ if(typeof module !== "undefined") {
 //end c6js
 //start esm
 /*export {
-	readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, uncompressTexture, convertBGR5A1toRGB5A1, setDebug, ICONJS_VERSION
+	readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, readCodeBreakerCbsFile, uncompressTexture, convertBGR5A1toRGB5A1, setDebug, ICONJS_VERSION
 };*/
 //end esm

@@ -47,6 +47,21 @@ switch(processObj.argv[2]) {
 		console.log(output);
 		break;
 	}
+	case "cbs": {
+		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.cbs");
+		function myInflator(inputBuffer) {
+			return (require("zlib").inflateSync(inputBuffer)).buffer;
+		}
+		const parsed = iconjs.readCodeBreakerCbsFile(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength), myInflator);
+		console.log(parsed);
+		const PS2D = iconjs.readPS2D(parsed[parsed.rootDirectory]["icon.sys"].data);
+		let output = {parsed, PS2D}
+		Object.keys(PS2D.filenames).forEach(function(file) {
+			output[file] = iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames[file]].data);
+		});
+		console.log(output);
+		break;
+	}
 	case "sys": {
 		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "icon.sys");
 		const metadata = iconjs.readPS2D(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
@@ -75,6 +90,7 @@ psu: Read a EMS Memory Adapter export file.
 psv: Read a PS3 export file.
 sps: Read a SharkPort export file.
 xps: Read a X-Port export file.
+cbs: Read a CodeBreaker Save export file.
 
 sys: Read a icon.sys (964 bytes) file, and attempt
      to read icon files from the current directory.

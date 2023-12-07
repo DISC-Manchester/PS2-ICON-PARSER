@@ -6,6 +6,8 @@
 		<meta name="description" content="A HTML client for icondumper2"></meta>
 		<title>icondumper2 - HTML reference client</title>
 		<script src="icon.js"></script>
+		<!-- If you need pako to be optional, remove/comment the bottom line. This will disable support for CBS reading, however -->
+		<script src="https://cdn.jsdelivr.net/npm/pako/dist/pako_inflate.min.js" integrity="sha512-mlnC6JeOvg9V4vBpWMxGKscsCdScB6yvGVCeFF2plnQMRmwH69s9F8SHPbC0oirqfePmRBhqx2s3Bx7WIvHfWg==" crossorigin="anonymous" id="inflator-installed"></script>
 		<style>
 			html {color: #ccc; background: black; font-family: sans-serif}
 			#title1, #title2 {
@@ -115,10 +117,8 @@
 		</script>
 	</head>
 	<body>
-		<label for="strictnessOption">enable strict mode</label>
-		<input id="strictnessOption" type="checkbox" checked></input>
-		<span>(enables console-accurate title parsing) | </span>
-		<label for="showExtractedInputOption">show other import options</label>
+		<span><b>Options:</b></span>
+		<label for="showExtractedInputOption">Show icon.sys and raw icon file readers.</label>
 		<input id="showExtractedInputOption" type="checkbox"></input>
 		<hr>
 		<div id="titlebox">
@@ -132,12 +132,14 @@
 		<p>Normal: <kbd id="iconn">(no&nbsp;file)<wbr></kbd> Copying: <kbd id="iconc">(no&nbsp;file)<wbr></kbd> Deleting: <kbd id="icond">(no&nbsp;file)</kbd></p>
 		<div id="advanced">
 			<hr>
-			<label for="input">icon.sys goes here:</label>
-			<input type="file" id="input" name="input" accept=".sys" />
-			<br>
-			<label for="icon">.ic(n|o) goes here:</label>
-			<input type="file" id="icon" name="icon" accept=".icn, .ico" />
-			<br>
+			<div class="inputbox">
+				<label for="input">icon.sys goes here:</label>
+				<input type="file" id="input" name="input" accept=".sys" />
+			</div>
+			<div class="inputbox">
+				<label for="icon">raw icon file goes here:</label>
+				<input type="file" id="icon" name="icon" accept=".icn, .ico" />
+			</div>
 		</div>
 		<hr>
 		<div class="inputbox">
@@ -151,6 +153,10 @@
 		<div class="inputbox">
 			<label for="spsinput">SharkPort/X-Port export file (.sps, .xps) goes here:</label>
 			<input type="file" id="spsinput" name="spsinput" accept=".sps, .xps" />
+		</div>
+		<div class="inputbox">
+			<label for="cbsinput">CodeBreaker Save export file (.cbs) goes here:</label>
+			<input type="file" id="cbsinput" name="cbsinput" accept=".cbs" />
 		</div>
 		<p>
 			<span>Date&nbsp;created: </span><span id="dateCreated">--:--:--&nbsp;--/--/----</span><span> UTC+09:00</span>
@@ -420,14 +426,6 @@
 					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, GlobalState.dataLength);
 				}
 			}
-			document.getElementById("strictnessOption").onchange = function(e) {
-				setStrictness(e.target.checked);
-				if(!!filebox.files.length) {filebox.onchange();}
-				if(!!iconbox.files.length) {iconbox.onchange();}
-				if(!!psubox.files.length) {psubox.onchange();}
-				if(!!psvbox.files.length) {psvbox.onchange();}
-				if(!!spsbox.files.length) {spsbox.onchange();}
-			}
 			filebox = document.getElementById("input");
 			filebox.onchange = function(e) {
 				resetDisplay();
@@ -588,6 +586,51 @@
 					}
 				};
 			}
+			cbsbox = document.getElementById("cbsinput");
+			cbsbox.onchange = function(e) {
+				resetDisplay();
+				if(cbsbox.files.length === 0) {
+					return;
+				}
+				function inflator(data) {
+					return (pako.inflate(data)).buffer;
+				}
+				GlobalState.fileReader.readAsArrayBuffer(cbsbox.files[0]);
+				GlobalState.fileReader.onloadend = function() {
+					GlobalState.fileReader.onloadend = void(0);
+					try {
+						let vFilesystem = readCodeBreakerCbsFile(GlobalState.fileReader.result, inflator);
+						let output = readPS2D(vFilesystem[vFilesystem.rootDirectory]["icon.sys"].data);
+						updateDisplay(output);
+						let output2 = new Object();
+						Object.keys(output.filenames).forEach(function(file) {
+							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
+						});
+						GlobalState.iconState.cachedIconSys = output;
+						GlobalState.iconState.currentSubmodel = 0;
+						GlobalState.iconState.source = output2;
+						GlobalState.iconState.currentIcon = output2.n;
+						renderIcon(output2.n, output);
+						let cTime = vFilesystem.timestamps.created;
+						let mTime = vFilesystem.timestamps.modified;
+						//TODO: use Time() to align JST times to user-local timezone
+						if(cTime.year === 0) {
+							// if root directory time is null, read icon.sys instead
+							cTime = vFilesystem[vFilesystem.rootDirectory]["icon.sys"].timestamps.created;
+							mTime = vFilesystem[vFilesystem.rootDirectory]["icon.sys"].timestamps.modified;
+						}
+						document.getElementById("dateCreated").textContent = `${p0in(cTime.hours.toString())}:${p0in(cTime.minutes.toString())}:${p0in(cTime.seconds.toString())} ${p0in(cTime.day.toString())}/${p0in(cTime.month.toString())}/${cTime.year.toString()}`;
+						document.getElementById("dateModified").textContent = `${p0in(mTime.hours.toString())}:${p0in(mTime.minutes.toString())}:${p0in(mTime.seconds.toString())} ${p0in(mTime.day.toString())}/${p0in(mTime.month.toString())}/${mTime.year.toString()}`;
+						console.info("model files (cbs)", output2);
+						console.info("icon.sys (cbs)", output);
+					} catch(e) {
+						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
+						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
+						console.error(e);
+						alert(e);
+					}
+				}
+			}
 			function createShader(gl, type, source) {
 				let shader = gl.createShader(type);
 				gl.shaderSource(shader, source);
@@ -643,7 +686,6 @@
 				glBgContext.vertexAttribPointer(attributes.color, 4, glBgContext.FLOAT, false, 0, 0);
 				//.section WRITE
 				glBgContext.drawArrays(glBgContext.TRIANGLE_STRIP, 0, 4);
-				
 			}
 			if(glBgContext !== null) {
 				//.section CONFIGURATION
@@ -662,12 +704,15 @@
 			document.getElementById("showExtractedInputOption").onchange = function(e) {
 				document.getElementById("advanced").style.display = ((e.target.checked) ? "block" : "none");
 			}
+			if (typeof pako === "undefined") {
+				document.getElementById("cbsinput").disabled = true;
+			}
 			//todo: More than one model shape rendering, other 2 icons (technically done? NMW though), Animation parsing, animation tweening
 		</script>
 		<span id="version">icondumper2 <a href="./documentation" id="iconjsVersion">(unknown icon.js version)</a> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
 		<script>
 			document.getElementById("iconjsVersion").textContent = exports.version;
-			document.getElementById("clientVersion").textContent = "0.6.7";
+			document.getElementById("clientVersion").textContent = "0.7.0";
 			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
 		</script>
 	</body>
