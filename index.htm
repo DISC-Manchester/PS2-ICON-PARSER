@@ -7,7 +7,7 @@
 		<title>icondumper2 - HTML reference client</title>
 		<script src="icon.js"></script>
 		<!-- If you need pako to be optional, remove/comment the bottom line. This will disable support for CBS reading, however -->
-		<script src="https://cdn.jsdelivr.net/npm/pako/dist/pako_inflate.min.js" integrity="sha512-mlnC6JeOvg9V4vBpWMxGKscsCdScB6yvGVCeFF2plnQMRmwH69s9F8SHPbC0oirqfePmRBhqx2s3Bx7WIvHfWg==" crossorigin="anonymous" id="inflator-installed"></script>
+		<script src="https://cdn.jsdelivr.net/npm/pako/dist/pako_inflate.es5.min.js" integrity="sha512-tHdgbM+jAAm3zeGYP67IjUouqHYEMuT/Wg/xvTrfEE7zsSX2GJj0G26pyobvn8Hb2LVWGp+UwsLM2HvXwCY+og==" crossorigin="anonymous"></script>
 		<style>
 			html {color: #ccc; background: black; font-family: sans-serif}
 			#title1, #title2 {
@@ -23,11 +23,15 @@
 			#version {text-shadow: 1px 1px 2px black;}
 			a {color: #ccc;}
 			.inputbox {
-				display: inline-grid;
+				display: table-cell;
 				margin-right: 0.25em;
 				border: 1px gray solid;
 				padding: 0.175em 0.25em 0 0.25em;
 				margin-bottom: 4px;
+				border-right: 0;
+			}
+			.last-input {
+				border-right: 1px gray solid;
 			}
 		</style>
 		<meta data-comment="WebGL Shader: Icon">
@@ -136,7 +140,7 @@
 				<label for="input">icon.sys goes here:</label>
 				<input type="file" id="input" name="input" accept=".sys" />
 			</div>
-			<div class="inputbox">
+			<div class="inputbox last-input">
 				<label for="icon">raw icon file goes here:</label>
 				<input type="file" id="icon" name="icon" accept=".icn, .ico" />
 			</div>
@@ -154,7 +158,7 @@
 			<label for="spsinput">SharkPort/X-Port export file (.sps, .xps) goes here:</label>
 			<input type="file" id="spsinput" name="spsinput" accept=".sps, .xps" />
 		</div>
-		<div class="inputbox">
+		<div class="inputbox last-input">
 			<label for="cbsinput">CodeBreaker Save export file (.cbs) goes here:</label>
 			<input type="file" id="cbsinput" name="cbsinput" accept=".cbs" />
 		</div>
@@ -712,7 +716,7 @@
 		<span id="version">icondumper2 <a href="./documentation" id="iconjsVersion">(unknown icon.js version)</a> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
 		<script>
 			document.getElementById("iconjsVersion").textContent = exports.version;
-			document.getElementById("clientVersion").textContent = "0.7.0";
+			document.getElementById("clientVersion").textContent = "0.7.0+u1";
 			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
 		</script>
 	</body>
