@@ -6,6 +6,7 @@
 		<meta name="description" content="A HTML client for icondumper2"></meta>
 		<title>icondumper2 - HTML reference client</title>
 		<script src="icon.js"></script>
+		<script src="lzari.js"></script>
 		<!-- If you need pako to be optional, remove/comment the bottom line. This will disable support for CBS reading, however -->
 		<script src="https://cdn.jsdelivr.net/npm/pako/dist/pako_inflate.es5.min.js" integrity="sha512-tHdgbM+jAAm3zeGYP67IjUouqHYEMuT/Wg/xvTrfEE7zsSX2GJj0G26pyobvn8Hb2LVWGp+UwsLM2HvXwCY+og==" crossorigin="anonymous"></script>
 		<style>
@@ -32,6 +33,9 @@
 			}
 			.last-input {
 				border-right: 1px gray solid;
+			}
+			.inputbox > input {
+				width: 100%;
 			}
 		</style>
 		<meta data-comment="WebGL Shader: Icon">
@@ -137,30 +141,34 @@
 		<div id="advanced">
 			<hr>
 			<div class="inputbox">
-				<label for="input">icon.sys goes here:</label>
+				<label for="input">icon.sys:</label>
 				<input type="file" id="input" name="input" accept=".sys" />
 			</div>
 			<div class="inputbox last-input">
-				<label for="icon">raw icon file goes here:</label>
+				<label for="icon">raw icon file:</label>
 				<input type="file" id="icon" name="icon" accept=".icn, .ico" />
 			</div>
 		</div>
 		<hr>
 		<div class="inputbox">
-			<label for="psuinput">EMS Memory Adapter export file (.psu) goes here:</label>
+			<label for="psuinput">EMS Memory Adapter export file (.psu):</label>
 			<input type="file" id="psuinput" name="psuinput" accept=".psu" />
 		</div>
 		<div class="inputbox">
-			<label for="psvinput">PS3 export file (.psv) goes here:</label>
+			<label for="psvinput">PS3 export file (.psv):</label>
 			<input type="file" id="psvinput" name="psvinput" accept=".psv" />
 		</div>
 		<div class="inputbox">
-			<label for="spsinput">SharkPort/X-Port export file (.sps, .xps) goes here:</label>
+			<label for="spsinput">SharkPort/X-Port export file (.sps, .xps):</label>
 			<input type="file" id="spsinput" name="spsinput" accept=".sps, .xps" />
 		</div>
-		<div class="inputbox last-input">
-			<label for="cbsinput">CodeBreaker Save export file (.cbs) goes here:</label>
+		<div class="inputbox">
+			<label for="cbsinput">CodeBreaker Save export file (.cbs):</label>
 			<input type="file" id="cbsinput" name="cbsinput" accept=".cbs" />
+		</div>
+		<div class="inputbox last-input">
+			<label for="maxinput">Max Drive/PowerSave export file (.max):</label>
+			<input type="file" id="maxinput" name="maxinput" accept=".max, .pws" />
 		</div>
 		<p>
 			<span>Date&nbsp;created: </span><span id="dateCreated">--:--:--&nbsp;--/--/----</span><span> UTC+09:00</span>
@@ -305,7 +313,9 @@
 				GlobalState.rotations = 2;
 				GlobalState.iconState.currentSubmodel = 0;
 				//clear buffers
-				glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);
+				if(glFgContext !== null) {
+					glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);
+				}
 			}
 			function renderIcon(iconData, fileMetadata = null, clearData = true) {
 				if(fileMetadata === null) {
@@ -635,6 +645,41 @@
 					}
 				}
 			}
+			pwsbox = document.getElementById("maxinput");
+			pwsbox.onchange = function(e) {
+				resetDisplay();
+				if(pwsbox.files.length === 0) {
+					return;
+				}
+				function decompressor(data) {
+					return (decodeLzari(data)).buffer;
+				}
+				GlobalState.fileReader.readAsArrayBuffer(pwsbox.files[0]);
+				GlobalState.fileReader.onloadend = function() {
+					GlobalState.fileReader.onloadend = void(0);
+					try {
+						let vFilesystem = readMaxPwsFile(GlobalState.fileReader.result, decompressor);
+						let output = readPS2D(vFilesystem[vFilesystem.rootDirectory]["icon.sys"].data);
+						updateDisplay(output);
+						let output2 = new Object();
+						Object.keys(output.filenames).forEach(function(file) {
+							output2[file] = readIconFile(vFilesystem[vFilesystem.rootDirectory][output.filenames[file]].data);
+						});
+						GlobalState.iconState.cachedIconSys = output;
+						GlobalState.iconState.currentSubmodel = 0;
+						GlobalState.iconState.source = output2;
+						GlobalState.iconState.currentIcon = output2.n;
+						renderIcon(output2.n, output);
+						console.info("model files (cbs)", output2);
+						console.info("icon.sys (cbs)", output);
+					} catch(e) {
+						if(glBgContext!==null){glBgContext.clear(glBgContext.COLOR_BUFFER_BIT);}
+						if(glFgContext!==null){glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);}
+						console.error(e);
+						alert(e);
+					}
+				}
+			}
 			function createShader(gl, type, source) {
 				let shader = gl.createShader(type);
 				gl.shaderSource(shader, source);
@@ -716,7 +761,7 @@
 		<span id="version">icondumper2 <a href="./documentation" id="iconjsVersion">(unknown icon.js version)</a> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
 		<script>
 			document.getElementById("iconjsVersion").textContent = exports.version;
-			document.getElementById("clientVersion").textContent = "0.7.0+u1";
+			document.getElementById("clientVersion").textContent = "0.8.0";
 			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
 		</script>
 	</body>

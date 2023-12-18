@@ -13,6 +13,8 @@ icon.sys
 *.p2m
 *.md
 *.cbs
+*.max
+*.pws
 
 # Unused data
 

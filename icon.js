@@ -1,5 +1,4 @@
 //To swap between mjs/esm and c6js, go to the end of this file, and (un)comment your wanted module mode.
-//LOOKING FOR: LZARI implementation (for MAX and PWS files. THIS WILL COMPLETE ICONDUMPER2.)
 var ICONJS_DEBUG = false;
 var ICONJS_STRICT = true;
 
@@ -8,7 +7,7 @@ var ICONJS_STRICT = true;
  * @constant {string}
  * @default
  */
-const ICONJS_VERSION = "0.7.0";
+const ICONJS_VERSION = "0.8.0";
 
 /**
  * The RC4 key used for ciphering CodeBreaker Saves.
@@ -488,7 +487,7 @@ function readEntryBlock(input) {
 function readEmsPsuFile(input){
 	const header = readEntryBlock(input.slice(0,0x1ff));
 	if(header.size > 0x7f) {
-		throw `Directory is too large! (maximum size: ${0x7f}, was ${header.size})`
+		throw `Directory is too large! (maximum size: ${0x7f}, was ${header.size})`;
 	}
 	let fsOut = {length: header.size, rootDirectory: header.filename, timestamps: header.timestamps};
 	let output = new Object();
@@ -637,7 +636,7 @@ function readSharkXPortSxpsFile(input) {
 	let offset = 4;
 	const ident = input.slice(offset, offset+identLength);
 	if((new TextDecoder("utf-8")).decode(ident) !== "SharkPortSave") {
-		throw `Unrecognized file identification string. Expected "SharkPortSave".`
+		throw `Unrecognized file identification string. Expected "SharkPortSave".`;
 	}
 	offset += (identLength + 4);
 	const titleLength = u32le(offset);
@@ -756,19 +755,95 @@ function readCodeBreakerCbsFile(input, inflator = null) {
 	const inflatedData = inflator(decipheredData);
 	const fsOut = {rootDirectory: dirName, timestamps};
 	fsOut[dirName] = readCodeBreakerCbsDirectory(inflatedData);
+	if(ICONJS_DEBUG) {
+		console.debug({magic, dataOffset, compressedSize, dirName, permissions, displayName});
+	}
 	return fsOut;
 }
+
+/**
+ * Read a Max Drive (MAX) or PowerSave (PWS) file's directory structure.
+ * @param {ArrayBuffer} input - Uncompressed input
+ * @returns {Object} (user didn't write a description)
+ * @protected
+ */
+function readMaxPwsDirectory(input, directorySize) {
+	const {u32le} = new yellowDataReader(input);
+	virtualFilesystem = new Object();
+	let offset = 0;
+	for (let index = 0; index < directorySize; index++) {
+		const dataSize = u32le(offset);
+		const _filename = input.slice(offset+4, offset+36);
+		const filename = stringScrubber((new TextDecoder("utf-8")).decode(_filename));
+		if(filename === "") { throw `Unexpected null filename at byte ${offset+4}.`; };
+		offset += 36;
+		const data = input.slice(offset, offset+dataSize);
+		offset += dataSize;
+		if(index !== directorySize - 1) {
+			while((offset & 15) !== 8) {
+				offset++;
+			}
+		}
+		virtualFilesystem[filename] = ({dataSize, data});
+	}
+	return virtualFilesystem;
+}
+
+/**
+ * Read a Max Drive (MAX) or PowerSave (PWS) file.
+ * @param {ArrayBuffer} input - MAX/PWS formatted file
+ * @param {function(Uint8Array): ArrayBuffer} unlzari - a function which provides a LZARI-compatible decompression function.
+ * @returns {Object} (user didn't write a description)
+ * @public
+ */
+function readMaxPwsFile(input, unlzari) {
+	if(typeof unlzari !== "function") {
+		throw `No decompresser function passed. Skipping.`;
+	}
+	const {u32le} = new yellowDataReader(input);
+	const ident = input.slice(0, 12);
+	if((new TextDecoder("utf-8")).decode(ident) !== "Ps2PowerSave") {
+		throw `Unrecognized file identification string. Expected "Ps2PowerSave".`;
+	}
+	//:skip 4 (u32 checksum)
+	const _dirName = input.slice(0x10, 0x30);
+	const dirName = stringScrubber((new TextDecoder("utf-8")).decode(_dirName));
+	const _displayName = input.slice(0x30, 0x50);
+	const displayName = stringScrubber((new TextDecoder("utf-8")).decode(_displayName));
+	const compressedSize = u32le(0x50);
+	if(compressedSize !== (input.byteLength - 88)) {
+		console.warn(`This file says it's larger then it actually is! (Given size: ${compressedSize}, actual size: ${input.byteLength - 88})`);
+	}
+	const size = u32le(0x54);
+	const compressedData = input.slice(88, input.byteLength);
+	const uncompressedData = unlzari(new Uint8Array(compressedData)); // read above why we can't trust given size
+	const fsOut = {rootDirectory: dirName};
+	fsOut[dirName] = readMaxPwsDirectory(uncompressedData, size);
+	// there's no... timestamps or permissions... this doesn't bode well.
+	if(ICONJS_DEBUG) {
+		console.debug({ident, compressedSize, dirName, displayName});
+	}
+	return fsOut;
+}
+
 
 /** 
  * Define (module.)exports with all public functions.
  * @exports icondumper2/icon
  */ // start c6js
-exports = {
-	readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, readCodeBreakerCbsFile},
-	helpers: {uncompressTexture, convertBGR5A1toRGB5A1}, 
-	options: {setDebug, setStrictness},
-	version: ICONJS_VERSION
-};
+if(typeof exports !== "object") {
+	exports = {
+		readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, readCodeBreakerCbsFile, readMaxPwsFile},
+		helpers: {uncompressTexture, convertBGR5A1toRGB5A1},
+		options: {setDebug, setStrictness},
+		version: ICONJS_VERSION
+	};
+} else {
+	exports.readers = {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, readCodeBreakerCbsFile, readMaxPwsFile};
+	exports.helpers = {uncompressTexture, convertBGR5A1toRGB5A1};
+	exports.options = {setDebug, setStrictness};
+	exports.version = ICONJS_VERSION;
+}
 
 if(typeof module !== "undefined") {
 	module.exports = exports;
@@ -776,6 +851,6 @@ if(typeof module !== "undefined") {
 //end c6js
 //start esm
 /*export {
-	readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, readCodeBreakerCbsFile, uncompressTexture, convertBGR5A1toRGB5A1, setDebug, ICONJS_VERSION
+	readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, readCodeBreakerCbsFile, readMaxPwsFile, uncompressTexture, convertBGR5A1toRGB5A1, setDebug, ICONJS_VERSION
 };*/
 //end esm

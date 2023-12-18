@@ -20,6 +20,7 @@ As of writing, there was no exporter that exists for the format that exhibited o
 * SharkPort export files (.sps)
 * X-Port export files (.xps)
 * CodeBreaker Save export files (.cbs)
+* Max Drive "PowerSave"/export files (.max)
 * PS2 icons (.ico, .icn)
 * PS2D format (icon.sys)
 
@@ -30,6 +31,7 @@ As of writing, there was no exporter that exists for the format that exhibited o
 * CommonJS (that includes node!) module exporting while still being compatible with other JavaScript implementations.
 * Convert a 128x128x16 BGR5A1 bitmap to a standard RGB5A1 format.
 * Convert an icon or a set of icons to glTF 2, with textures saved as PNG.
+* Decompress any LZARI-formatted data.
 
 ## What it doesn't do:
 * Create, manipulate or otherwise taint save files.
@@ -56,6 +58,7 @@ Because it replaced what *was* left of icondumper (1).
 | index.js         | Node.js example client.                   |
 | gltf-exporter.js | Node.js client to export icons to glTF 2. |
 | index.htm        | HTML reference client.                    |
+| lzari.js         | A LZARI decompression-only library.       |
 
 ## Included example files:
 | Directory    | Description                               | Formats  |

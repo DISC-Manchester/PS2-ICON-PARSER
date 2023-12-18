@@ -62,6 +62,22 @@ switch(processObj.argv[2]) {
 		console.log(output);
 		break;
 	}
+	case "max":
+	case "pws": {
+		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "file.max");
+		function myUnlzari(inputBuffer) {
+			return (require("./lzari.js").decodeLzari(inputBuffer)).buffer;
+		}
+		const parsed = iconjs.readMaxPwsFile(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength), myUnlzari);
+		console.log(parsed);
+		const PS2D = iconjs.readPS2D(parsed[parsed.rootDirectory]["icon.sys"].data);
+		let output = {parsed, PS2D}
+		Object.keys(PS2D.filenames).forEach(function(file) {
+			output[file] = iconjs.readIconFile(parsed[parsed.rootDirectory][PS2D.filenames[file]].data);
+		});
+		console.log(output);
+		break;
+	}
 	case "sys": {
 		let inputFile = filesystem.readFileSync(processObj.argv[3] ? processObj.argv[3] : "icon.sys");
 		const metadata = iconjs.readPS2D(inputFile.buffer.slice(inputFile.byteOffset, inputFile.byteOffset + inputFile.byteLength));
@@ -70,7 +86,6 @@ switch(processObj.argv[2]) {
 			Object.keys(metadata.filenames).forEach(function(file) {
 				let getFile = filesystem.readFileSync(metadata.filenames[file]);
 				const output = iconjs.readIconFile(getFile.buffer.slice(getFile.byteOffset, getFile.byteOffset + getFile.byteLength));
-				//console.log(individialIcon);
 				console.log(`contents of ${metadata.filenames[file]} (${file}):`, output, "\n");
 			});
 		}
@@ -91,6 +106,8 @@ psv: Read a PS3 export file.
 sps: Read a SharkPort export file.
 xps: Read a X-Port export file.
 cbs: Read a CodeBreaker Save export file.
+max: Read a Max Drive export file.
+pws: Read a PowerSave export file.
 
 sys: Read a icon.sys (964 bytes) file, and attempt
      to read icon files from the current directory.
