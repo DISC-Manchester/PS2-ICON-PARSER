@@ -7,7 +7,7 @@ var ICONJS_STRICT = true;
  * @constant {string}
  * @default
  */
-const ICONJS_VERSION = "0.8.0";
+const ICONJS_VERSION = "0.8.1";
 
 /**
  * The RC4 key used for ciphering CodeBreaker Saves.
@@ -151,6 +151,7 @@ function setDebug(value) {
  * @public
  */
 function setStrictness(value) {
+	console.info("setStrictness is deprecated!");
 	ICONJS_STRICT = !!value;
 }
 
@@ -188,7 +189,7 @@ function uncompressTexture(texData) {
 	let uncompressed = new Uint16Array(16384);
 	let offset = 0;
 	for (let index = 0; index < 16384;) {
-		currentValue = u16le(offset);
+		let currentValue = u16le(offset);
 		if(currentValue === 0) {
 			// if this is specifically a katamari 1 or 2 icon, skip this byte
 			// because it's formatted like that for some reason
@@ -196,7 +197,7 @@ function uncompressTexture(texData) {
 			currentValue = u16le(offset);
 		}
 		offset += 2;
-		if (currentValue >= 0xff00) {
+		if (currentValue >= 0xfe00) { // everyone says this is 0xff00 but gauntlet:DL tells me its lower
 			//do a raw copy of the next currentValue bytes
 			let length = ((0x10000 - currentValue));
 			for (let enumerator = 0; enumerator < length; enumerator++) {
