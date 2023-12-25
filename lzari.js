@@ -55,7 +55,7 @@ function BinarySearchSym(x) {
 	let i = 1;
 	let j = 314;
 	while (i < j) {
-		let k = ~~((i + j) / 2);
+		let k = ((i + j) / 2)|0;
 		if (symbolCumulative[k] > x) {
 			i = k + 1;
 		} else {
@@ -69,7 +69,7 @@ function BinarySearchPos(x) {
 	let i = 1;
 	let j = 4096;
 	while (i < j) {
-		let k = ~~((i + j) / 2);
+		let k = ((i + j) / 2)|0;
 		if (positionCumulative[k] > x) {
 			i = k + 1;
 		} else {
@@ -81,9 +81,9 @@ function BinarySearchPos(x) {
 
 function DecodeChar() {
 	var range = high - low;
-	var sym = BinarySearchSym(~~(((value - low + 1) * symbolCumulative[0] - 1) / range));
-	high = low + ~~((range * symbolCumulative[sym - 1]) / symbolCumulative[0]);
-	low +=       ~~((range * symbolCumulative[sym    ]) / symbolCumulative[0]);
+	var sym = BinarySearchSym((((value - low + 1) * symbolCumulative[0] - 1) / range)|0);
+	high = low + ((range * symbolCumulative[sym - 1]) / symbolCumulative[0])|0;
+	low +=       ((range * symbolCumulative[sym    ]) / symbolCumulative[0])|0;
 	for ( ; ; ) {
 		if (low >= 65536) {
 			value -= 65536;
@@ -132,9 +132,9 @@ function DecodeChar() {
 
 function DecodePosition() {
 	var range = high - low;
-	var position = BinarySearchPos(~~(((value - low + 1) * positionCumulative[0] - 1) / range));
-	high = low + (~~((range * positionCumulative[position    ]) / positionCumulative[0]));
-	low +=       (~~((range * positionCumulative[position + 1]) / positionCumulative[0]));
+	var position = BinarySearchPos((((value - low + 1) * positionCumulative[0] - 1) / range)|0);
+	high = low + ((range * positionCumulative[position    ]) / positionCumulative[0])|0;
+	low +=       ((range * positionCumulative[position + 1]) / positionCumulative[0])|0;
 	for ( ; ; ) {
 		if (low >= 65536) {
 			value -= 65536;
@@ -203,7 +203,7 @@ function decodeLzari(input) {
 	symbolFrequency[0] = 0;
 	positionCumulative[4096] = 0;
 	for (let i = 4096; i >= 1; i--) {
-		positionCumulative[i - 1] = (positionCumulative[i] + ~~(10000 / (i + 200)));
+		positionCumulative[i - 1] = (positionCumulative[i] + (10000 / (i + 200))|0);
 	}
 	//end transclusion
 	//normal Decode process

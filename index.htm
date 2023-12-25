@@ -4,7 +4,7 @@
 		<meta charset="utf-8"></meta>
 		<meta name="viewport" content="initial-scale=1.5"></meta>
 		<meta name="description" content="A HTML client for icondumper2"></meta>
-		<title>icondumper2 - HTML reference client</title>
+		<title>icondumper2 HTML reference client</title>
 		<script src="icon.js"></script>
 		<script src="lzari.js"></script>
 		<!-- If you need pako to be optional, remove/comment the bottom line. This will disable support for CBS reading, however -->
@@ -756,12 +756,15 @@
 			if (typeof pako === "undefined") {
 				document.getElementById("cbsinput").disabled = true;
 			}
+			if (typeof decodeLzari === "undefined") {
+				document.getElementById("maxinput").disabled = true;
+			}
 			//todo: More than one model shape rendering, other 2 icons (technically done? NMW though), Animation parsing, animation tweening
 		</script>
 		<span id="version">icondumper2 <a href="./documentation" id="iconjsVersion">(unknown icon.js version)</a> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
 		<script>
 			document.getElementById("iconjsVersion").textContent = exports.version;
-			document.getElementById("clientVersion").textContent = "0.8.0+u1";
+			document.getElementById("clientVersion").textContent = "0.8.0+u2";
 			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
 		</script>
 	</body>

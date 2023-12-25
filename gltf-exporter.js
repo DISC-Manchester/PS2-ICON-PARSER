@@ -99,13 +99,22 @@ function imf2gltf(icon = null, filename = "untitled") {
 		}]; // no indices because who needs indexing when you're transcoding?
 		gltfOutput.materials = [{
 			"name": `Material (${filename}#${index})`,
-			"pbrMetallicRoughness": {
-				"baseColorTexture": {"index":0, "texCoord": 0}
-			},
+			"pbrMetallicRoughness": null,
 			"extensions": { // or we get annoying PBR and specular stuff we don't need
 				"KHR_materials_unlit": {}
 			}
 		}];
+		if(icon.textureFormat !== "N") {
+			gltfOutput.materials.pbrMetallicRoughness = {
+				"baseColorTexture": {"index":0, "texCoord": 0}
+			};
+		} else {
+			gltfOutput.materials.pbrMetallicRoughness = {
+				"baseColorFactor": [1.0, 1.0, 1.0, 1.0],
+				"metallicFactor": 0.0,
+				"roughnessFactor": 1.0
+			}
+		}
 		gltfOutput.buffers = [{"uri": `${filename}.bin`, "byteLength": outputFloatArray.byteLength}];
 		gltfOutput.bufferViews = [
 			{
@@ -173,16 +182,14 @@ function imf2gltf(icon = null, filename = "untitled") {
 		];
 		gltfOutput.asset = {"version": "2.0", "generator": `icondumper2/${icondumper2.version}`}
 		gltfOutput.extensionsUsed = ["KHR_materials_unlit"];
-		gltfOutput.textures = [{"source": 0}];
-		gltfOutput.images = [{"name": `Texture (${filename}#${index})`, "uri": `${filename}.png`}]
+		if(icon.textureFormat !== "N") {
+			gltfOutput.textures = [{"source": 0}];
+			gltfOutput.images = [{"name": `Texture (${filename}#${index})`, "uri": `${filename}.png`}]
+		}
 		gltfOutputArray[index] = (gltfOutput);
 	}
 	let texture16 = null; // Uint16Array(16384)
 	switch(icon.textureFormat) {
-		case "N": {
-			texture16 = (new Uint16Array(16384)).fill(0xffff);
-			break;
-		}
 		case "C": {
 			texture16 = icondumper2.helpers.uncompressTexture(icon.texture.data);
 			break;
@@ -192,57 +199,61 @@ function imf2gltf(icon = null, filename = "untitled") {
 			break;
 		}
 	}
-	let texture24 = new Uint8Array(49983);
-	texture24.set([
-		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-		0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-		0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80,
-		0x08, 0x02, 0x00, 0x00, 0x00, // you may know 
-		0x4c, 0x5c, 0xf6, 0x9c, // what this is from 0x89.
-		0x00, 0x00, 0xc3, 0x06, 0x49, 0x44, 0x41, 0x54,
-		0x78, 0x01 // if you didn't get it, here's a clue
-	],0);
-	let textureOffset = 43;
-	let texture24Data = new Array();
-	let texture24CheckedData = new Array();
-	for (let x = 0; x < 128; x++) {
-		let line = [(x === 127 ? 1 : 0), 0x81, 0x01, 0x7e, 0xfe, 0x00];
-		texture24Data = texture24Data.concat(line);
-		texture24CheckedData.push(0);
-		let scanline = new Array(128*3);
-		for (let y = 0; y < 128; y++) {
-			color = rgb5a1_rgb8(texture16[(x*128)+y]);
-			scanline[(y*3)  ] = ((color >> 0 ) & 255);
-			scanline[(y*3)+1] = ((color >> 8 ) & 255);
-			scanline[(y*3)+2] = ((color >> 16) & 255);
+	if(texture16 !== null) {
+		let texture24 = new Uint8Array(49983);
+		texture24.set([
+			0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+			0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+			0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80,
+			0x08, 0x02, 0x00, 0x00, 0x00, // you may know 
+			0x4c, 0x5c, 0xf6, 0x9c, // what this is from 0x89.
+			0x00, 0x00, 0xc3, 0x06, 0x49, 0x44, 0x41, 0x54,
+			0x78, 0x01 // if you didn't get it, here's a clue
+		],0);
+		let textureOffset = 43;
+		let texture24Data = new Array();
+		let texture24CheckedData = new Array();
+		for (let x = 0; x < 128; x++) {
+			let line = [(x === 127 ? 1 : 0), 0x81, 0x01, 0x7e, 0xfe, 0x00];
+			texture24Data = texture24Data.concat(line);
+			texture24CheckedData.push(0);
+			let scanline = new Array(128*3);
+			for (let y = 0; y < 128; y++) {
+				color = rgb5a1_rgb8(texture16[(x*128)+y]);
+				scanline[(y*3)  ] = ((color >> 0 ) & 255);
+				scanline[(y*3)+1] = ((color >> 8 ) & 255);
+				scanline[(y*3)+2] = ((color >> 16) & 255);
+			}
+			texture24Data = texture24Data.concat(scanline);
+			texture24CheckedData = texture24CheckedData.concat(scanline);
 		}
-		texture24Data = texture24Data.concat(scanline);
-		texture24CheckedData = texture24CheckedData.concat(scanline);
+		texture24.set(texture24Data, textureOffset);
+		textureOffset += texture24Data.length;
+		let a32conv = new DataView(new ArrayBuffer(4));
+		a32conv.setInt32(0, getAdler32(new Uint8Array(texture24CheckedData)))
+		texture24.set([a32conv.getUint8(0), a32conv.getUint8(1), a32conv.getUint8(2), a32conv.getUint8(3)], textureOffset);
+		textureOffset += 4;
+		let crc32 = getCrc32(new Uint8Array([
+			0x49, 0x44, 0x41, 0x54, 0x78, 0x01, ...texture24Data, 
+			a32conv.getUint8(0), a32conv.getUint8(1), 
+			a32conv.getUint8(2), a32conv.getUint8(3)
+		]));
+		texture24.set([
+			(crc32 >> 24) & 0xff, 
+			(crc32 >> 16) & 0xff, 
+			(crc32 >>  8) & 0xff, 
+			 crc32        & 0xff
+		], textureOffset);
+		textureOffset += 4;
+		texture24.set([
+			0x00, 0x00, 0x00, 0x00,
+			0x49, 0x45, 0x4E, 0x44, 
+			0xae, 0x42, 0x60, 0x82
+		], textureOffset);
+		return {objects: gltfOutputArray, buffer: outputFloatArray, texture: texture24};
+	} else {
+		return {objects: gltfOutputArray, buffer: outputFloatArray, texture: null};
 	}
-	texture24.set(texture24Data, textureOffset);
-	textureOffset += texture24Data.length;
-	let a32conv = new DataView(new ArrayBuffer(4));
-	a32conv.setInt32(0, getAdler32(new Uint8Array(texture24CheckedData)))
-	texture24.set([a32conv.getUint8(0), a32conv.getUint8(1), a32conv.getUint8(2), a32conv.getUint8(3)], textureOffset);
-	textureOffset += 4;
-	let crc32 = getCrc32(new Uint8Array([
-		0x49, 0x44, 0x41, 0x54, 0x78, 0x01, ...texture24Data, 
-		a32conv.getUint8(0), a32conv.getUint8(1), 
-		a32conv.getUint8(2), a32conv.getUint8(3)
-	]));
-	texture24.set([
-		(crc32 >> 24) & 0xff, 
-		(crc32 >> 16) & 0xff, 
-		(crc32 >>  8) & 0xff, 
-		 crc32        & 0xff
-	], textureOffset);
-	textureOffset += 4;
-	texture24.set([
-		0x00, 0x00, 0x00, 0x00,
-		0x49, 0x45, 0x4E, 0x44, 
-		0xae, 0x42, 0x60, 0x82
-	], textureOffset);
-	return {objects: gltfOutputArray, buffer: outputFloatArray, texture: texture24};
 }
 
 function loadAndConvertIcon(inputData, attemptedFilename = "-") {
@@ -257,9 +268,10 @@ function loadAndConvertIcon(inputData, attemptedFilename = "-") {
 	}
 	(require("fs")).writeFileSync(`${filename}.bin`, glTF_output.buffer);
 	console.info(`Saved glTF buffer as "${filename}.bin".`);
-
-	(require("fs")).writeFileSync(`${filename}.png`, glTF_output.texture);
-	console.info(`Saved texture as "${filename}.png".\n`);
+	if(glTF_output.texture !== null) {
+		(require("fs")).writeFileSync(`${filename}.png`, glTF_output.texture);
+		console.info(`Saved texture as "${filename}.png".\n`);
+	}
 }
 
 // can anything de-dupe this code somehow? (index.js)
