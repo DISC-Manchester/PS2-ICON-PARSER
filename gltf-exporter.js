@@ -105,11 +105,11 @@ function imf2gltf(icon = null, filename = "untitled") {
 			}
 		}];
 		if(icon.textureFormat !== "N") {
-			gltfOutput.materials.pbrMetallicRoughness = {
+			gltfOutput.materials[0].pbrMetallicRoughness = {
 				"baseColorTexture": {"index":0, "texCoord": 0}
 			};
 		} else {
-			gltfOutput.materials.pbrMetallicRoughness = {
+			gltfOutput.materials[0].pbrMetallicRoughness = {
 				"baseColorFactor": [1.0, 1.0, 1.0, 1.0],
 				"metallicFactor": 0.0,
 				"roughnessFactor": 1.0
