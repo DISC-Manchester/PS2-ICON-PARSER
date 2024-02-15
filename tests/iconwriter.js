@@ -174,20 +174,18 @@ const animData = new Uint8Array([
 	0x00, 0x00, 0x00, 0x00
 ]); // 36 bytes
  
-/** generate texture data **/
+/** generate texture data (RAW: fill with red) **/
 const texture_ = new Uint16Array(16384);
 for (let indice = 0; indice < 16384; indice++) {
 	texture_[indice] = 0b1_00000_00000_11111; //A1BGR5
 } // 32768 bytes
-/** for compressed textures **/
-const compressTexture_ = new Uint16Array(4);
-compressTexture_[0] = 0x0004;
-compressTexture_[1] = 0x0000;
-compressTexture_[2] = 0x4000;
-compressTexture_[3] = 0b1_11111_00000_00000;
+/** for compressed textures (RLE: fill with blue) **/
+texture_[0] = 0x0004;
+texture_[1] = 0x0000;
+texture_[2] = 0x4000;
+texture_[3] = 0b1_11111_00000_00000;
 
 const textureData = new Uint8Array(texture_.buffer);
-const compressedTextureData = new Uint8Array(compressTexture_.buffer);
 
 /** ps2d data **/
 const metadataSkeleton = new Uint8Array(Array.from({...[
@@ -273,12 +271,6 @@ CombinedIconData.set(iconData, 20);
 CombinedIconData.set(animData, 20+864);
 CombinedIconData.set(textureData, 20+864+36);
 
-const CombinedCompressedIconData = new Uint8Array(1024/*20+864+36+16*/); // psu still want block size
-CombinedCompressedIconData.set(iconHeader, 0);
-CombinedCompressedIconData.set(iconData, 20);
-CombinedCompressedIconData.set(animData, 20+864);
-CombinedCompressedIconData.set(compressedTextureData, 20+864+36);
-
 /** root directory **/
 const psuHeader1 = new Uint8Array(Array.from({...[
 	0x27, 0x84, 0x00, 0x00,		0x04, 0x00, 0x00, 0x00,
@@ -347,22 +339,13 @@ const psuHeader5 = new Uint8Array(Array.from({...[
 ], length:512}));
 
 /** write psus **/
-for (let iconIndice = 0; iconIndice < 16; iconIndice++) {
+for (let iconIndice = 0; iconIndice < 32; iconIndice++) { // realistically only needs to be 0-15, not 0-31.
 	let needsAlpha = 0;
-	let needsCompression = false;
 	if(iconIndice > 9) {
 		needsAlpha = 7; // if we're past 9, offset to start at A instead
 	}
-	if(iconIndice > 8) {
-		needsCompression = true;
-	}
-	const PsuFileOutput = new Uint8Array(needsCompression ? 5120 : 37888);	// 6 compressed, 37 uncompressed blocks
-	if(needsCompression) {
-		psuHeader5[4] = 0xa8;
-		psuHeader5[5] = 0x03;
-	}
-	CombinedIconData[8] =			iconIndice; // set texture type for uncompressed
-	CombinedCompressedIconData[8] =	iconIndice; // set texture type for compressed
+	const PsuFileOutput = new Uint8Array(37888);	// 37 uncompressed blocks
+	CombinedIconData[8] =			iconIndice; // set texture type
 	psuHeader1[75] = 0x30 +			iconIndice+needsAlpha; // set folder name
 	psuHeader5[71] = 0x30 +			iconIndice+needsAlpha; // set file name
 	metadataSkeleton[251] = 0x4f +	iconIndice+needsAlpha; // set display name
@@ -376,9 +359,9 @@ for (let iconIndice = 0; iconIndice < 16; iconIndice++) {
 	PsuFileOutput.set(psuHeader4,1536);
 	PsuFileOutput.set(metadataSkeleton,2048);
 	PsuFileOutput.set(psuHeader5,3072);
-	PsuFileOutput.set(needsCompression ? CombinedCompressedIconData : CombinedIconData, 3584);
+	PsuFileOutput.set(CombinedIconData, 3584);
 	// and then 512 bytes of padding since we don't reach a block yet
 	if(typeof require !== "undefined") {
-		require("fs").writeFileSync(`${iconIndice.toString(16)}_file.psu`, PsuFileOutput);
+		require("fs").writeFileSync(`${iconIndice.toString(36)}_file.psu`, PsuFileOutput);
 	}
 }
