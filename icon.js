@@ -7,7 +7,7 @@ var ICONJS_STRICT = true;
  * @constant {string}
  * @default
  */
-const ICONJS_VERSION = "0.8.1";
+const ICONJS_VERSION = "0.8.2";
 
 /**
  * The RC4 key used for ciphering CodeBreaker Saves.
@@ -162,15 +162,18 @@ function setStrictness(value) {
  * @access protected
  */
 function getTextureFormat(i) {
-	if (i<8) {
-		if(i==3) {
-			return 'N';
+	if(ICONJS_DEBUG) {
+		console.debug("Texture format: %i", i);
+	}
+	// bit 1: enable smooth shading (TODO)
+	// bit 2: ??? something weird with colours, check iconwriter.js output...
+	if(!!(i & 4)) { // if bit 3 (textured)...
+		if(!!(i & 8)) { // if bit 4 (compressed)...
+			return "C"; // Compressed.
 		}
-		return 'U';
-	} else if (i>=8) {
-		return 'C';
-	} else {
-		return void(0);
+		return "U"; // Uncompressed.
+	} else { // if bit 3 isn't set...
+		return "N"; // No texture.
 	}
 }
 
