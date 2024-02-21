@@ -6,9 +6,11 @@ A set of vertices with may or may not include a texture while defining colours f
 
 ## Why?
 Current implementations had some issues with rendering some icons. These were mostly:
-* Not rendering any color for texture type 3.
-* Failing to decompress some specific RLE-compressed icons. (types above 8)
+* Not rendering any color for texture types 0-3.
+* Failing to decompress some specific RLE-compressed icons. (types with bit 4 enabled)
 * Requires writing/reading a specific format for successful output of data.
+* Incorrect analysis of texture types leading to assuming texture type 1 isn't the same group as texture type 3.
+* Further incorrect analysis revealing it's that the texture type is a bitmask.
 
 As of writing, there was no exporter that exists for the format that exhibited one of these problems.
 
@@ -39,9 +41,9 @@ As of writing, there was no exporter that exists for the format that exhibited o
 * Use any implementation-specific features.
 
 ## Client compatibility:
-The library requires use of `const`, `let` and `class` declarations.
+The library currently requires use of `const`, `let` and `class` declarations, template literals, and destructuring assignment for variables.
 
-Any JavaScript implementation should work if they support all three of these declarations.
+Any JavaScript implementation should work if they support all of the required features.
 
 ### Tested clients:
 * Chrome (or Blink-based browser) 49 (or higher) - HTML reference client
@@ -52,13 +54,14 @@ Any JavaScript implementation should work if they support all three of these dec
 Because it replaced what *was* left of icondumper (1).
 
 ## Included files:
-| File             | Description                               |
-| ---------------- | ----------------------------------------- |
-| icon.js          | The library itself.                       |
-| index.js         | Node.js example client.                   |
-| gltf-exporter.js | Node.js client to export icons to glTF 2. |
-| index.htm        | HTML reference client.                    |
-| lzari.js         | A LZARI decompression-only library.       |
+| File                | Description                                     |
+| ------------------- | ----------------------------------------------- |
+| icon.js             | The library itself.                             |
+| index.js            | Node.js example client.                         |
+| gltf-exporter.js    | Node.js client to export icons to glTF 2.       |
+| index.htm           | HTML reference client.                          |
+| lzari.js            | A LZARI decompression-only library.             |
+| tests/iconwriter.js | Node.js. Creates icons with texture types 0-31. |
 
 ## Included example files:
 | Directory    | Description                               | Formats  |

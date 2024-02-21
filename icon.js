@@ -1,4 +1,5 @@
 //To swap between mjs/esm and c6js, go to the end of this file, and (un)comment your wanted module mode.
+/* jshint bitwise: false, esversion: 6, -W009, -W010 */ // not doing this makes linters scream about BWOs, es6 features, and using new Primitive() instead of said primitives
 var ICONJS_DEBUG = false;
 var ICONJS_STRICT = true;
 
@@ -7,7 +8,7 @@ var ICONJS_STRICT = true;
  * @constant {string}
  * @default
  */
-const ICONJS_VERSION = "0.8.2";
+const ICONJS_VERSION = "0.8.3";
 
 /**
  * The RC4 key used for ciphering CodeBreaker Saves.
@@ -62,22 +63,22 @@ class yellowDataReader extends DataView {
 	 * @param {number} i Indice offset.
 	 * @returns {number}
 	 */
-	u16le(i){return super.getUint16(i, 1)};
+	u16le(i){return super.getUint16(i, 1);}
 	/** Fixed-point 16-bit, Little Endian.
 	 * @param {number} i Indice offset.
 	 * @returns {number}
 	 */
-	f16le(i){return (super.getInt16(i, 1) / 4096)};
+	f16le(i){return (super.getInt16(i, 1) / 4096);}
 	/** Unsigned 32-bit, Little Endian.
 	 * @param {number} i Indice offset.
 	 * @returns {number}
 	 */
-	u32le(i){return super.getUint32(i, 1)};
+	u32le(i){return super.getUint32(i, 1);}
 	/** Floating-point 32-bit, Little Endian.
 	 * @param {number} i Indice offset.
 	 * @returns {number}
 	 */
-	f32le(i){return super.getFloat32(i, 1)};
+	f32le(i){return super.getFloat32(i, 1);}
 	/** 64-bit Timestamp structure, Little Endian.
 	 * Time returned is set for JST (UTC+09:00) instead of UTC.
 	 * Time returned is going to be offseted for JST (GMT+09:00).
@@ -97,7 +98,7 @@ class yellowDataReader extends DataView {
 		day: super.getUint8(i+4),
 		month: super.getUint8(i+5),
 		year: super.getUint16(i+6, 1)
-	}};
+	};}
 	constructor(buffer) {
 		super(buffer);
 		return {
@@ -106,7 +107,7 @@ class yellowDataReader extends DataView {
 			u32le: this.u32le.bind(this),
 			f32le: this.f32le.bind(this),
 			t64le: this.t64le.bind(this)
-		}
+		};
 	}
 }
 
@@ -213,7 +214,7 @@ function uncompressTexture(texData) {
 			uncompressed[index] = u16le(offset);
 			for (let indey = 0; indey < currentValue; indey++) {
 				uncompressed[index] = u16le(offset);
-				index++
+				index++;
 			}
 			offset += 2;
 		}
@@ -285,13 +286,13 @@ function readPS2D(input) {
 		{x: f32le(80), y: f32le(84), z: f32le(88)}, //:skip 4
 		{x: f32le(96), y: f32le(100), z: f32le(104)}, //:skip 4
 		{x: f32le(112), y: f32le(116), z: f32le(120)} //:skip 4
-	]
+	];
 	const lightColors = [
 		{r: f32le(128), g: f32le(132), b: f32le(136), a: f32le(140)},
 		{r: f32le(144), g: f32le(148), b: f32le(152), a: f32le(156)},
 		{r: f32le(160), g: f32le(164), b: f32le(168), a: f32le(172)},
 		{r: f32le(176), g: f32le(180), b: f32le(184), a: f32le(188)}	
-	]
+	];
 	// P2SB says color 1 is ambient, 2-4 are for 3-point cameras
 	// official HDD icon.sys files (completely different PS2ICON text-based format) also say the same.
 	const int_title = input.slice(0xc0, 0x100);
@@ -317,7 +318,7 @@ function readPS2D(input) {
 		n: stringScrubber((new TextDecoder("utf-8")).decode(int_filename_n)),
 		c: stringScrubber((new TextDecoder("utf-8")).decode(int_filename_c)),
 		d: stringScrubber((new TextDecoder("utf-8")).decode(int_filename_d))
-	}
+	};
 	if(ICONJS_DEBUG){
 		console.debug({header, titleOffset, bgAlpha, bgColors, lightIndices, lightColors, title, filenames});
 	}
@@ -339,7 +340,7 @@ function readIconFile(input) {
 		b: ((i & 0xff0000) >> 16), 
 		a: (i > 0x7fffffff ? 255 : (((i & 0xff000000) >>> 24) * 2)+1)
 		// I don't think alpha transparency is actually USED in icons?, rendering with it looks strange.
-	}};
+	};};
 	const magic = u32le(0);
 	if (magic !== 0x010000) {
 		// USER NOTICE: So far, I have yet to parse an icon that hasn't had 0x00010000 as it's magic.
@@ -354,7 +355,7 @@ function readIconFile(input) {
 	const textureFormat = getTextureFormat(textureType);
 	//:skip 4
 	const numberOfVertexes = u32le(16);
-	if(!!(numberOfVertexes % 3)){
+	if((numberOfVertexes % 3) > 0){
 		throw `Not enough vertices to define a triangle (${numberOfVertexes % 3} vertices remained).`;
 	}
 	// format: [xxyyzzaa * numberOfShapes][xxyyzzaa][uuvvrgba], ((8 * numberOfShapes) + 16) [per chunk]
@@ -389,7 +390,7 @@ function readIconFile(input) {
 		vertices.push({shapes, normal, uv, color});
 	}
 	offset = (20+(numberOfVertexes * chunkLength));
-	animationHeader = {id: u32le(offset), length: u32le(offset+4), speed: f32le(offset+8), "offset": u32le(offset+12), keyframes: u32le(offset+16)};
+	const animationHeader = {id: u32le(offset), length: u32le(offset+4), speed: f32le(offset+8), "offset": u32le(offset+12), keyframes: u32le(offset+16)};
 	let animData = new Array();
 	// now we have to enumerate values, so now we introduce an offset value.
 	// format for a keyframe: sssskkkk[ffffvvvv] where [ffffvvvv] repeat based on the value that kkkk(eys) has.
@@ -436,7 +437,7 @@ function readIconFile(input) {
 			//output of this will be another u16[0x4000] of the decompressed texture
 			//after that just parse output as-if it was uncompressed.
 			//see uncompressTexture() and convertBGR5A1toRGB5A1() for more info.
-			size = u32le(offset);
+			const size = u32le(offset);
 			texture = {size, data: input.slice(offset+4, offset+(4+size))};
 		}
 	}
@@ -497,7 +498,7 @@ function readEmsPsuFile(input){
 	let output = new Object();
 	let offset = 512;
 	for (let index = 0; index < header.size; index++) {
-		fdesc = readEntryBlock(input.slice(offset, offset + 512));
+		const fdesc = readEntryBlock(input.slice(offset, offset + 512));
 		switch(fdesc.type) {
 			case "directory": {
 				offset += 512;
@@ -569,15 +570,21 @@ function readPsvFile(input){
 	for (let index = 0; index < numberOfFiles; index++) {
 		fileData.push(input.slice(offset,offset+0x3c));
 		offset += 0x3c;
-	};
+	}
 	//then file data after this but we already have pointers to the files we care about
 	const icons = {
 		n: input.slice(nModelOffset, nModelOffset+nModelSize),
 		c: input.slice(cModelOffset, cModelOffset+cModelSize),
 		d: input.slice(dModelOffset, dModelOffset+dModelSize),
-	}
+	};
 	if (ICONJS_DEBUG) {
-		console.debug({magic, type1, type2, displayedSize, ps2dOffset, ps2dSize, nModelOffset, nModelSize, cModelOffset, cModelSize, dModelOffset, dModelSize, numberOfFiles, rootDirectoryData, fileData})
+		console.debug({magic, type1, type2, displayedSize,
+			ps2dOffset, ps2dSize,
+			nModelOffset, nModelSize,
+			cModelOffset, cModelSize,
+			dModelOffset, dModelSize,
+			numberOfFiles, rootDirectoryData, fileData
+		});
 	}
 	return {icons, "icon.sys": input.slice(ps2dOffset, ps2dOffset+ps2dSize), timestamps};
 }
@@ -660,11 +667,11 @@ function readSharkXPortSxpsFile(input) {
 	const comments = {
 		"game": stringScrubber((new TextDecoder("utf-8")).decode(title)),
 		"name": stringScrubber((new TextDecoder("utf-8")).decode(description))
-	}
+	};
 	if(description2Length !== 0) {
 		comments.desc = stringScrubber((new TextDecoder("utf-8")).decode(description2));
 	}
-	const totalSize = u32le(offset);
+	//const totalSize = u32le(offset); has data, unused in script
 	offset += 4;
 	const header = readSxpsDescriptor(input.slice(offset, offset + 250));
 	offset += 250;
@@ -672,7 +679,7 @@ function readSharkXPortSxpsFile(input) {
 	let fsOut = {length: header.size, rootDirectory: header.filename, timestamps: header.timestamps, comments};
 	let output = new Object();
 	for (let index = 0; index < (header.size - 2); index++) {
-		fdesc = readSxpsDescriptor(input.slice(offset, offset + 250));
+		const fdesc = readSxpsDescriptor(input.slice(offset, offset + 250));
 		switch(fdesc.type) {
 			case "directory": {
 				offset += 250;
@@ -731,7 +738,7 @@ function readCodeBreakerCbsDirectory(input) {
  */
 function readCodeBreakerCbsFile(input, inflator = null) {
 	if(typeof inflator !== "function") {
-		throw `No inflator function passed. Skipping.`;
+		throw "No inflator function passed. Skipping.";
 	}
 	const {u32le, t64le} = new yellowDataReader(input);
 	const magic = u32le(0);
@@ -773,13 +780,13 @@ function readCodeBreakerCbsFile(input, inflator = null) {
  */
 function readMaxPwsDirectory(input, directorySize) {
 	const {u32le} = new yellowDataReader(input);
-	virtualFilesystem = new Object();
+	const virtualFilesystem = new Object();
 	let offset = 0;
 	for (let index = 0; index < directorySize; index++) {
 		const dataSize = u32le(offset);
 		const _filename = input.slice(offset+4, offset+36);
 		const filename = stringScrubber((new TextDecoder("utf-8")).decode(_filename));
-		if(filename === "") { throw `Unexpected null filename at byte ${offset+4}.`; };
+		if(filename === "") { throw `Unexpected null filename at byte ${offset+4}.`; }
 		offset += 36;
 		const data = input.slice(offset, offset+dataSize);
 		offset += dataSize;
@@ -802,12 +809,12 @@ function readMaxPwsDirectory(input, directorySize) {
  */
 function readMaxPwsFile(input, unlzari) {
 	if(typeof unlzari !== "function") {
-		throw `No decompresser function passed. Skipping.`;
+		throw "No decompresser function passed. Skipping.";
 	}
 	const {u32le} = new yellowDataReader(input);
 	const ident = input.slice(0, 12);
 	if((new TextDecoder("utf-8")).decode(ident) !== "Ps2PowerSave") {
-		throw `Unrecognized file identification string. Expected "Ps2PowerSave".`;
+		throw "Unrecognized file identification string. Expected \"Ps2PowerSave\".";
 	}
 	//:skip 4 (u32 checksum)
 	const _dirName = input.slice(0x10, 0x30);
@@ -834,21 +841,22 @@ function readMaxPwsFile(input, unlzari) {
 /** 
  * Define (module.)exports with all public functions.
  * @exports icondumper2/icon
- */ // start c6js
+ */ // start c6js#
+/* globals exports: true */
 if(typeof exports !== "object") {
 	exports = {
-		readers: {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, readCodeBreakerCbsFile, readMaxPwsFile},
-		helpers: {uncompressTexture, convertBGR5A1toRGB5A1},
-		options: {setDebug, setStrictness},
+		readers: {"readIconFile": readIconFile, "readPS2D": readPS2D, "readEmsPsuFile": readEmsPsuFile, "readPsvFile": readPsvFile, "readSharkXPortSxpsFile": readSharkXPortSxpsFile, "readCodeBreakerCbsFile": readCodeBreakerCbsFile, "readMaxPwsFile": readMaxPwsFile},
+		helpers: {"uncompressTexture": uncompressTexture, "convertBGR5A1toRGB5A1": convertBGR5A1toRGB5A1},
+		options: {"setDebug": setDebug, "setStrictness": setStrictness},
 		version: ICONJS_VERSION
 	};
 } else {
-	exports.readers = {readIconFile, readPS2D, readEmsPsuFile, readPsvFile, readSharkXPortSxpsFile, readCodeBreakerCbsFile, readMaxPwsFile};
-	exports.helpers = {uncompressTexture, convertBGR5A1toRGB5A1};
-	exports.options = {setDebug, setStrictness};
+	exports.readers = {"readIconFile": readIconFile, "readPS2D": readPS2D, "readEmsPsuFile": readEmsPsuFile, "readPsvFile": readPsvFile, "readSharkXPortSxpsFile": readSharkXPortSxpsFile, "readCodeBreakerCbsFile": readCodeBreakerCbsFile, "readMaxPwsFile": readMaxPwsFile};
+	exports.helpers = {"uncompressTexture": uncompressTexture, "convertBGR5A1toRGB5A1": convertBGR5A1toRGB5A1};
+	exports.options = {"setDebug": setDebug, "setStrictness": setStrictness};
 	exports.version = ICONJS_VERSION;
 }
-
+/* globals module: true */
 if(typeof module !== "undefined") {
 	module.exports = exports;
 }

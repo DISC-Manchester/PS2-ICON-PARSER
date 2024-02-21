@@ -24,7 +24,7 @@
 *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
 *  DEALINGS IN THE SOFTWARE.
 **/
-
+/* jshint bitwise: false */ // not doing this makes linters scream about BWOs
 //TODO: privatize variables and document the library
 
 var inputData = null;
@@ -43,7 +43,7 @@ var bit_Mask = 0;
 
 function GetBit() {
 	//partial xgetc modification
-	if(inputLocation >= inputData.length) {return -1};
+	if(inputLocation >= inputData.length) {return -1;}
 	if((bit_Mask >>= 1) === 0) {
 		bit_Buffer = inputData[inputLocation++];
 		bit_Mask = 128;
@@ -52,10 +52,10 @@ function GetBit() {
 }
 
 function BinarySearchSym(x) {
-	let i = 1;
-	let j = 314;
+	var i = 1;
+	var j = 314;
 	while (i < j) {
-		let k = ((i + j) / 2)|0;
+		var k = ((i + j) / 2)|0;
 		if (symbolCumulative[k] > x) {
 			i = k + 1;
 		} else {
@@ -66,10 +66,10 @@ function BinarySearchSym(x) {
 }
 
 function BinarySearchPos(x) {
-	let i = 1;
-	let j = 4096;
+	var i = 1;
+	var j = 4096;
 	while (i < j) {
-		let k = ((i + j) / 2)|0;
+		var k = ((i + j) / 2)|0;
 		if (positionCumulative[k] > x) {
 			i = k + 1;
 		} else {
@@ -93,28 +93,28 @@ function DecodeChar() {
 			value -= 32768;
 			low -= 32768;
 			high -= 32768;
-		} else if (high > 65536) { break };		
+		} else if (high > 65536) { break; }	
 		low += low;
 		high += high;
 		value = 2 * value + GetBit();
 	}
 	//transcluded UpdateModel
-	let character = symbolToCharacter[sym];
+	var character = symbolToCharacter[sym];
 	// do not remove above, will be overwritten otherwise!
-	let i;
+	var i;
 	
 	if(symbolCumulative[0] >= 32767) {
-		let chr = 0;
+		var chr = 0;
 		for (i = 314; i > 0; i--) {
 			symbolCumulative[i] = chr;
 			chr += (symbolFrequency[i] = (symbolFrequency[i] + 1) >> 1);
 		}
 		symbolCumulative[0] = chr;
 	}
-	for(i = sym; symbolFrequency[i] === symbolFrequency[i - 1]; i--) {};
+	for(i = sym; symbolFrequency[i] === symbolFrequency[i - 1]; i--) {}
 	if (i < sym) {
-		let ch_i = symbolToCharacter[i];
-		let ch_sym = symbolToCharacter[sym];
+		var ch_i = symbolToCharacter[i];
+		var ch_sym = symbolToCharacter[sym];
 		symbolToCharacter[i] = ch_sym;
 		symbolToCharacter[sym] = ch_i;
 		characterToSymbol[ch_i] = sym;
@@ -144,7 +144,7 @@ function DecodePosition() {
 			value -= 32768;
 			low -= 32768;
 			high -= 32768;
-		} else if (high > 65536) { break };
+		} else if (high > 65536) { break; }
 		low += low;
 		high += high;
 		value = 2 * value + GetBit();
@@ -178,23 +178,22 @@ function decodeLzari(input) {
     inputData = input;
 	inputLocation = 4;
 
-    let dataSize = new DataView(input.buffer).getInt32(0,1);
+    var dataSize = new DataView(input.buffer).getInt32(0,1);
 
     if (dataSize == 0) return(0);
     if (dataSize < 0) return(-1);
 
-	let outputLength = dataSize;
-	let outputData = new Uint8Array(dataSize);
-	let outputLocation = 0;
+	var outputData = new Uint8Array(dataSize);
+	var outputLocation = 0;
 
 	//transcluded StartDecode
-	for (let i = 0; i < 17; i++) {
+	for (var i = 0; i < 17; i++) {
 		value = 2 * value + GetBit();
 	}
 	//transcluded StartModel
 	symbolCumulative[314] = 0;
-	for (let sym = 314; sym >= 1; sym--) {
-		let ch = sym - 1;
+	for (var sym = 314; sym >= 1; sym--) {
+		var ch = sym - 1;
 		characterToSymbol[ch] = sym;
 		symbolToCharacter[sym] = ch;
 		symbolFrequency[sym] = 1;
@@ -202,29 +201,29 @@ function decodeLzari(input) {
 	}
 	symbolFrequency[0] = 0;
 	positionCumulative[4096] = 0;
-	for (let i = 4096; i >= 1; i--) {
+	for (i = 4096; i >= 1; i--) { // redefine i
 		positionCumulative[i - 1] = (positionCumulative[i] + (10000 / (i + 200))|0);
 	}
 	//end transclusion
 	//normal Decode process
 
-	for (let i = 0; i < 4036; i++) {
+	for (i = 0; i < 4036; i++) { // redefine i
 		text_buffer[i] = 32;
 	}
 	var r = 4036;
 
-	for (let count = 0; count < dataSize; ) {
-        if(inputLocation >= inputData.length) {break};
-		let c = DecodeChar();
+	for (var count = 0; count < dataSize; ) {
+        if(inputLocation >= inputData.length) {break;}
+		var c = DecodeChar();
 		if (c < 256) {
 			outputData[outputLocation++] = c;
 			text_buffer[r++] = c;
 			r &= (4095);
 			count++;
 		} else {
-			let i = (r - DecodePosition() - 1) & 4095;
-			let j = c - 253;
-			for (let k = 0; k < j; k++) {
+			i = (r - DecodePosition() - 1) & 4095; // redefine i
+			var j = c - 253;
+			for (var k = 0; k < j; k++) {
 				c = text_buffer[(i + k) & 4095];
 				outputData[outputLocation++] = c;
 				text_buffer[r++] = c;
@@ -241,14 +240,15 @@ function decodeLzari(input) {
  * Define (module.)exports with all public functions.
  * @exports icondumper2/lzari
  */ // start c6js
+/* globals exports: true */
 if(typeof exports !== "object") {
 	exports = {
-		decodeLzari
+		"decodeLzari": decodeLzari
 	};
 } else {
 	exports.decodeLzari = decodeLzari;
 }
-
+/* globals module: true */
 if(typeof module !== "undefined") {
 	module.exports = exports;
 }
