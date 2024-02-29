@@ -8,7 +8,7 @@ var ICONJS_STRICT = true;
  * @constant {string}
  * @default
  */
-const ICONJS_VERSION = "0.8.3";
+const ICONJS_VERSION = "0.8.4";
 
 /**
  * The RC4 key used for ciphering CodeBreaker Saves.
@@ -92,6 +92,7 @@ class yellowDataReader extends DataView {
 	 * @property {number} year - Year.
 	 */
 	t64le(i){return {
+		"__proto__": null,
 		seconds: super.getUint8(i+1),
 		minutes: super.getUint8(i+2),
 		hours: super.getUint8(i+3),
@@ -494,8 +495,8 @@ function readEmsPsuFile(input){
 	if(header.size > 0x7f) {
 		throw `Directory is too large! (maximum size: ${0x7f}, was ${header.size})`;
 	}
-	let fsOut = {length: header.size, rootDirectory: header.filename, timestamps: header.timestamps};
-	let output = new Object();
+	let fsOut = {"__proto__": null, length: header.size, rootDirectory: header.filename, timestamps: header.timestamps};
+	let output = {"__proto__": null};
 	let offset = 512;
 	for (let index = 0; index < header.size; index++) {
 		const fdesc = readEntryBlock(input.slice(offset, offset + 512));
@@ -676,8 +677,8 @@ function readSharkXPortSxpsFile(input) {
 	const header = readSxpsDescriptor(input.slice(offset, offset + 250));
 	offset += 250;
 	// alright now lets parse some actual data
-	let fsOut = {length: header.size, rootDirectory: header.filename, timestamps: header.timestamps, comments};
-	let output = new Object();
+	let fsOut = {"__proto__": null, length: header.size, rootDirectory: header.filename, timestamps: header.timestamps, comments};
+	let output = {"__proto__": null};
 	for (let index = 0; index < (header.size - 2); index++) {
 		const fdesc = readSxpsDescriptor(input.slice(offset, offset + 250));
 		switch(fdesc.type) {
@@ -713,7 +714,7 @@ function readSharkXPortSxpsFile(input) {
  */
 function readCodeBreakerCbsDirectory(input) {
 	const {u32le, t64le} = new yellowDataReader(input);
-	const virtualFilesystem = new Object();
+	const virtualFilesystem = {"__proto__": null};
 	for (let offset = 0; offset < input.byteLength;) {
 		const timestamps = {created: t64le(offset), modified: t64le(offset+8)};
 		const dataSize = u32le(offset+16);
@@ -764,7 +765,7 @@ function readCodeBreakerCbsFile(input, inflator = null) {
 	const compressedData = input.slice(dataOffset, dataOffset + compressedSize);
 	const decipheredData = rc4Cipher(ICONJS_CBS_RC4_KEY, new Uint8Array(compressedData));
 	const inflatedData = inflator(decipheredData);
-	const fsOut = {rootDirectory: dirName, timestamps};
+	const fsOut = {"__proto__": null, rootDirectory: dirName, timestamps};
 	fsOut[dirName] = readCodeBreakerCbsDirectory(inflatedData);
 	if(ICONJS_DEBUG) {
 		console.debug({magic, dataOffset, compressedSize, dirName, permissions, displayName});
@@ -780,7 +781,7 @@ function readCodeBreakerCbsFile(input, inflator = null) {
  */
 function readMaxPwsDirectory(input, directorySize) {
 	const {u32le} = new yellowDataReader(input);
-	const virtualFilesystem = new Object();
+	const virtualFilesystem = {"__proto__": null};
 	let offset = 0;
 	for (let index = 0; index < directorySize; index++) {
 		const dataSize = u32le(offset);
@@ -828,7 +829,7 @@ function readMaxPwsFile(input, unlzari) {
 	const size = u32le(0x54);
 	const compressedData = input.slice(88, input.byteLength);
 	const uncompressedData = unlzari(new Uint8Array(compressedData)); // read above why we can't trust given size
-	const fsOut = {rootDirectory: dirName};
+	const fsOut = {"__proto__": null, rootDirectory: dirName};
 	fsOut[dirName] = readMaxPwsDirectory(uncompressedData, size);
 	// there's no... timestamps or permissions... this doesn't bode well.
 	if(ICONJS_DEBUG) {

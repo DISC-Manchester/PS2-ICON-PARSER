@@ -6,8 +6,9 @@
 		<meta name="description" content="A HTML client for icondumper2"></meta>
 		<title>icondumper2 HTML reference client</title>
 		<script src="icon.js"></script>
+		<!-- Removing or commenting below will disable MAX reading... -->
 		<script src="lzari.js"></script>
-		<!-- If you need pako to be optional, remove/comment the bottom line. This will disable support for CBS reading, however -->
+		<!-- If you need pako to be optional, remove/comment the line below. This will disable support for CBS reading, however. -->
 		<script src="https://cdn.jsdelivr.net/npm/pako/dist/pako_inflate.es5.min.js" integrity="sha512-tHdgbM+jAAm3zeGYP67IjUouqHYEMuT/Wg/xvTrfEE7zsSX2GJj0G26pyobvn8Hb2LVWGp+UwsLM2HvXwCY+og==" crossorigin="anonymous"></script>
 		<style>
 			html {color: #ccc; background: black; font-family: sans-serif}
@@ -41,12 +42,14 @@
 		<meta data-comment="WebGL Shader: Icon">
 		<script type="text/plain" id="shader-icon-v">
 			attribute vec3 a_position;
+			attribute vec3 a_nextPosition;
 			attribute vec3 a_normal;
 			attribute vec2 a_textureCoords;
 			attribute vec4 a_color;
 
 			uniform float u_rotation;
 			uniform float u_scale;
+			uniform float u_interp;
 			uniform highp vec3 u_ambientLight;
 			//uniform highp vec3 u_lightColorA;
 			//uniform highp vec3 u_lightColorB;
@@ -58,11 +61,12 @@
 			void main() {	
 				float angle = radians(360.0) * u_rotation;
 				vec2 pos = vec2(cos(angle), sin(angle));
+				vec3 lv_interp = mix(a_position, a_nextPosition, u_interp);
 				// x, y, z, scale (w)
 				gl_Position = vec4(
-					(a_position.x * pos.x) + (a_position.z * pos.y), //transform the x position
-					(0.0 - a_position.y) - 2.75, // invert the y position and move down -2.75, which will center the model
-					(a_position.x * -pos.y) + (a_position.z * pos.x), //transform the z position
+					(lv_interp.x * pos.x) + (lv_interp.z * pos.y), //transform the x position
+					(-lv_interp.y) - 2.75, // invert the y position and move down -2.75, which will center the model
+					(lv_interp.x * -pos.y) + (lv_interp.z * pos.x), //transform the z position
 					u_scale
 				);
 				// flip it, scale it
@@ -133,7 +137,7 @@
 			<h1 id="title1">&#xFF2E;&#xFF4F;&#x3000;&#xFF26;&#xFF49;&#xFF4C;&#xFF45;</h1> 
 			<h1 id="title2">&#xFF2C;&#xFF4F;&#xFF41;&#xFF44;&#xFF45;&#xFF44;</h1>
 		</div>
-		<span>Background/icon preview (Keyboard controls: rotate: &larr;/&rarr;, scale: &uarr;/&darr;, frame-step: &minus;/&equals;, change icon: 1:N/2:C/3:D):</span><br>
+		<span>Background/icon preview (Keyboard controls: rotate: &larr;/&rarr;, scale: &uarr;/&darr;, step: &minus;/=, play: &lt;/&gt;, change icon: 1:N/2:C/3:D):</span><br>
 		<canvas id="bgcanvas" width="480" height="480"></canvas>
 		<canvas id="iconcanvas" width="480" height="480"></canvas>
 		<hr>
@@ -179,8 +183,12 @@
 			<span>File comments: </span><span id="fileCommentGame">(no title)</span><span> - </span><span id="fileCommentName">(no description)</span><span> - </span><span id="fileCommentDesc">(no other text)</span>
 		</p>
 		<script>
-			// I usually don't do in-body <script>'s, but I didn't want to do an await onload() again
-			const GlobalState = {rotations: 2, dataLength: 0, uniforms: {rotation: null, scale: null}, iconState: {source: null, currentIcon: null, currentSubmodel: 0, cachedIconSys: null}, fileReader: (new FileReader)};
+			// I usually don't do in-body <script>'s, but I didn't want to do an awaited onload() again
+			const GlobalState = {"__proto__": null, rotations: 2, scale: 0, interpfactor: 0, dataLength: 0,
+				uniforms: {"__proto__": null, rotation: null, scale: null},
+				iconState: {"__proto__": null, source: null, currentIcon: null, currentSubmodel: 0, cachedIconSys: null},
+				fileReader: (new FileReader)
+			};
 			// I don't care HOW disgusting doing this is, I'm sick of pressing escape to clear these.
 			let allInputs = document.querySelectorAll('input[type="file"]');
 			Array.from(allInputs).forEach(
@@ -191,10 +199,15 @@
 				}
 			);
 			function p0in(input) { // "prefix 0 if needed"
+				if(typeof input !== "string") {input = input.toString()};
 				return ((input.length>=2) ? input : `0${input}`);
 			};
+			function timeToString(t64leOutput) {
+				return `${p0in(t64leOutput.hours)}:${p0in(t64leOutput.minutes)}:${p0in(t64leOutput.seconds)} ${p0in(t64leOutput.day)}/${p0in(t64leOutput.month)}/${t64leOutput.year}`
+			}
 			// rotation stuff
-			const rotationDensity = 60;
+			var rotationDensity = 60;
+			var interpolationRate = 0.34;
 			document.body.onkeydown = function(ev) {
 				if(glBgContext === null || GlobalState.iconState.currentIcon === null) {return;}
 					if(typeof GlobalState.uniforms.rotation !== "undefined") {
@@ -224,6 +237,7 @@
 							if(GlobalState.iconState.currentSubmodel < 0) {
 								GlobalState.iconState.currentSubmodel = GlobalState.iconState.currentIcon.numberOfShapes - 1;
 							}
+							GlobalState.interpfactor = 1.0;
 							renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
 							break;
 						}
@@ -232,6 +246,7 @@
 							if(GlobalState.iconState.currentSubmodel > (GlobalState.iconState.currentIcon.numberOfShapes - 1)) {
 								GlobalState.iconState.currentSubmodel = 0;
 							}
+							GlobalState.interpfactor = 0.0;
 							renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
 							break;
 						}
@@ -253,12 +268,41 @@
 							renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
 							break;
 						}
+						case "Comma": {
+							GlobalState.interpfactor -= interpolationRate;
+							// if we're at the lowest interp, move onto previous shape
+							if(GlobalState.interpfactor <= 0.0) {
+								GlobalState.iconState.currentSubmodel--;
+								if(GlobalState.iconState.currentSubmodel < 0) {
+									GlobalState.iconState.currentSubmodel = GlobalState.iconState.currentIcon.numberOfShapes - 1;
+								}
+								GlobalState.interpfactor = 1.0;
+								renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
+								break;
+							}
+							break;;
+						}
+						case "Period": {
+							GlobalState.interpfactor += interpolationRate;
+							// if we're at the highest interp, move onto next shape
+							if(GlobalState.interpfactor >= 1.0) {
+								GlobalState.iconState.currentSubmodel++;
+								if(GlobalState.iconState.currentSubmodel > (GlobalState.iconState.currentIcon.numberOfShapes - 1)) {
+									GlobalState.iconState.currentSubmodel = 0;
+								}
+								GlobalState.interpfactor = 0.0;
+								renderIcon(GlobalState.iconState.currentIcon, GlobalState.iconState.cachedIconSys, false);
+								break;
+							}
+							break;
+						}
 						default: {
 							return;
 						}
 					};
 					glFgContext.uniform1f(GlobalState.uniforms.scale, GlobalState.scale);
 					glFgContext.uniform1f(GlobalState.uniforms.rotation, (GlobalState.rotations/rotationDensity));
+					glFgContext.uniform1f(GlobalState.uniforms.interpolation, GlobalState.interpfactor);
 					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, GlobalState.dataLength);
 				} else {return;}
 			}
@@ -292,7 +336,7 @@
 				}
 			}
 			function resetDisplay() {
-				//reset displayed elements
+				// reset displayed elements
 				document.getElementById("title1").textContent = "\uff0d";
 				document.getElementById("title2").textContent = "\uff0d";
 				document.getElementById("iconn").textContent = "?";
@@ -303,7 +347,7 @@
 				document.getElementById("fileCommentGame").textContent = "(no title)";
 				document.getElementById("fileCommentName").textContent = "(no description)";
 				document.getElementById("fileCommentDesc").textContent = "(no other text)";
-				//reset globalstate parameters
+				// reset globalstate parameters
 				GlobalState.iconState.cachedIconSys = null;
 				GlobalState.iconState.currentIcon = null;
 				GlobalState.iconState.source = null;
@@ -312,7 +356,7 @@
 				GlobalState.dataLength = 0;
 				GlobalState.rotations = 2;
 				GlobalState.iconState.currentSubmodel = 0;
-				//clear buffers
+				// clear buffers
 				if(glFgContext !== null) {
 					glFgContext.clear(glFgContext.COLOR_BUFFER_BIT | glFgContext.DEPTH_BUFFER_BIT);
 				}
@@ -323,10 +367,10 @@
 						"lighting": {
 							"points": [{x:0,y:0,z:0},{x:0,y:0,z:0},{x:0,y:0,z:0}],
 							"colors": [
-								{r:1,g:1,b:1,a:1}, //ambient
-								{r:1,g:0,b:0,a:1}, //p[0]
-								{r:0,g:1,b:0,a:1}, //p[1]
-								{r:0,g:0,b:1,a:1}  //p[2]
+								{r:1,g:1,b:1,a:1}, // ambient
+								{r:1,g:0,b:0,a:1}, // point0
+								{r:0,g:1,b:0,a:1}, // point1
+								{r:0,g:0,b:1,a:1}  // point2
 							]
 						}
 					};
@@ -355,37 +399,37 @@
 					}
 					let iconProgram = createProgram(glFgContext, iconVertexShader, iconFragmentShader);
 					glFgContext.useProgram(iconProgram);
+					var attributes = {
+						color: glFgContext.getAttribLocation(iconProgram, "a_color"),
+						position: glFgContext.getAttribLocation(iconProgram, "a_position"),
+						nextPosition: glFgContext.getAttribLocation(iconProgram, "a_nextPosition")
+					};
+					var uniforms = {
+						ambientLighting: glFgContext.getUniformLocation(iconProgram, "u_ambientLight"),
+						scale: glFgContext.getUniformLocation(iconProgram, "u_scale"),
+						interpolation: glFgContext.getUniformLocation(iconProgram, "u_interp"),
+						rotation: glFgContext.getUniformLocation(iconProgram, "u_rotation")
+					}
 					if(iconData.textureFormat !== "N") {
-						var attributes = {
-							position: glFgContext.getAttribLocation(iconProgram, "a_position"),
-							textureCoords: glFgContext.getAttribLocation(iconProgram, "a_textureCoords"),
-							color: glFgContext.getAttribLocation(iconProgram, "a_color"),
-						};
-						var uniforms = {
-							rotation: glFgContext.getUniformLocation(iconProgram, "u_rotation"),
-							ambientLighting: glFgContext.getUniformLocation(iconProgram, "u_ambientLight"),
-							scale: glFgContext.getUniformLocation(iconProgram, "u_scale")
-						}
-					} else {
-						var attributes = {
-							position: glFgContext.getAttribLocation(iconProgram, "a_position"),
-							color: glFgContext.getAttribLocation(iconProgram, "a_color"),
-						};
-						var uniforms = {
-							sampler: glFgContext.getUniformLocation(iconProgram, "u_sampler"),
-							rotation: glFgContext.getUniformLocation(iconProgram, "u_rotation"),
-							ambientLighting: glFgContext.getUniformLocation(iconProgram, "u_ambientLight"),
-							scale: glFgContext.getUniformLocation(iconProgram, "u_scale")
-						}
+						attributes["textureCoords"] = glFgContext.getAttribLocation(iconProgram, "a_textureCoords");
+						uniforms["sampler"] = glFgContext.getUniformLocation(iconProgram, "u_sampler");
 					}
 					//.section SETUP
 					let verticesArray = new Array();
+					let nextVerticesArray = new Array();
 					let colourArray = new Array();
 					let uvArray = new Array();
+					let nextShape = GlobalState.iconState.currentSubmodel + 1;
+					if(nextShape > (iconData.numberOfShapes - 1)) {
+						nextShape = 0;
+					}
 					iconData.vertices.forEach(function(vertexObject){
 						verticesArray.push(vertexObject.shapes[GlobalState.iconState.currentSubmodel].x);
 						verticesArray.push(vertexObject.shapes[GlobalState.iconState.currentSubmodel].y);
 						verticesArray.push(vertexObject.shapes[GlobalState.iconState.currentSubmodel].z);
+						nextVerticesArray.push(vertexObject.shapes[nextShape].x);
+						nextVerticesArray.push(vertexObject.shapes[nextShape].y);
+						nextVerticesArray.push(vertexObject.shapes[nextShape].z);
 						colourArray.push(vertexObject.color.r/255);
 						colourArray.push(vertexObject.color.g/255);
 						colourArray.push(vertexObject.color.b/255);
@@ -393,12 +437,19 @@
 						uvArray.push(vertexObject.uv.u);
 						uvArray.push(vertexObject.uv.v);
 					});
+					// TODO: Might need normals too for lighting...
 					//.section VERTICES
 					const positionBuffer = glFgContext.createBuffer();
 					glFgContext.bindBuffer(glFgContext.ARRAY_BUFFER, positionBuffer);
 					glFgContext.enableVertexAttribArray(attributes.position);
 					glFgContext.bufferData(glFgContext.ARRAY_BUFFER, new Float32Array(verticesArray), glFgContext.STATIC_DRAW);
 					glFgContext.vertexAttribPointer(attributes.position, 3, glFgContext.FLOAT, false, 0, 0);
+					//.section VERTICES_2
+					const nextPositionBuffer = glFgContext.createBuffer();
+					glFgContext.bindBuffer(glFgContext.ARRAY_BUFFER, nextPositionBuffer);
+					glFgContext.enableVertexAttribArray(attributes.nextPosition);
+					glFgContext.bufferData(glFgContext.ARRAY_BUFFER, new Float32Array(nextVerticesArray), glFgContext.STATIC_DRAW);
+					glFgContext.vertexAttribPointer(attributes.nextPosition, 3, glFgContext.FLOAT, false, 0, 0);
 					//.section COLOURS
 					const colorBuffer = glFgContext.createBuffer();
 					glFgContext.bindBuffer(glFgContext.ARRAY_BUFFER, colorBuffer);
@@ -421,21 +472,27 @@
 					// sets the angle uniform to 2/rotationDensity, this puts the icon at an angle.
 					// globalize uniform rotation
 					GlobalState.uniforms.rotation = uniforms.rotation;
-					if(clearData){GlobalState.rotations = 2;}
+					if (clearData) {GlobalState.rotations = 2;}
 					glFgContext.uniform1f(GlobalState.uniforms.rotation, GlobalState.rotations/rotationDensity);
 
 					//.section LIGHTING
-					let colours = fileMetadata.lighting.colors[0];
-					//glFgContext.uniform3f(uniforms.ambientLighting, colours.r, colours.g, colours.b);
+					let colours = fileMetadata.lighting.colors[0]; // get ambient lighting colours
+					// glFgContext.uniform3f(uniforms.ambientLighting, colours.r, colours.g, colours.b);
+					// TODO: figure out why rendering goes all sorts of bad when we use the actual values.
 					glFgContext.uniform3f(uniforms.ambientLighting, 0.75, 0.75, 0.75);
 
 					//.section SCALING
 					GlobalState.uniforms.scale = uniforms.scale;
-					if(clearData){GlobalState.scale = 3.5;}
+					if (clearData) {GlobalState.scale = 3.5;}
 					glFgContext.uniform1f(GlobalState.uniforms.scale, GlobalState.scale);
+					
+					//.section INTERPOLATION
+					GlobalState.uniforms.interpolation = uniforms.interpolation;
+					if (clearData) {GlobalState.interpfactor = 0.0;}
+					glFgContext.uniform1f(GlobalState.uniforms.interpolation, GlobalState.interpfactor);
 
 					//.section WRITE
-					//globalize count of triangles, as well
+					// globalize count of triangles, as well
 					GlobalState.dataLength = (verticesArray.length/3);
 					glFgContext.drawArrays(glFgContext.TRIANGLES, 0, GlobalState.dataLength);
 				}
@@ -507,9 +564,9 @@
 						renderIcon(output2.n, output);
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
-						//TODO: use Time() to align JST times to user-local timezone
-						document.getElementById("dateCreated").textContent = `${p0in(cTime.hours.toString())}:${p0in(cTime.minutes.toString())}:${p0in(cTime.seconds.toString())} ${p0in(cTime.day.toString())}/${p0in(cTime.month.toString())}/${cTime.year}`;
-						document.getElementById("dateModified").textContent = `${p0in(mTime.hours.toString())}:${p0in(mTime.minutes.toString())}:${p0in(mTime.seconds.toString())} ${p0in(mTime.day.toString())}/${p0in(mTime.month.toString())}/${mTime.year}`;
+						// TODO: use Time() to align JST times to user-local timezone
+						document.getElementById("dateCreated").textContent = timeToString(cTime);
+						document.getElementById("dateModified").textContent = timeToString(mTime);
 						console.info("model files (psu)", output2);
 						console.info("icon.sys (psu)", output);
 					} catch(e) {
@@ -545,9 +602,9 @@
 						renderIcon(icons.n, output);
 						let cTime = inputData.timestamps.created;
 						let mTime = inputData.timestamps.modified;
-						//TODO: use Time() to align JST times to user-local timezone
-						document.getElementById("dateCreated").textContent = `${p0in(cTime.hours.toString())}:${p0in(cTime.minutes.toString())}:${p0in(cTime.seconds.toString())} ${p0in(cTime.day.toString())}/${p0in(cTime.month.toString())}/${cTime.year}`;
-						document.getElementById("dateModified").textContent = `${p0in(mTime.hours.toString())}:${p0in(mTime.minutes.toString())}:${p0in(mTime.seconds.toString())} ${p0in(mTime.day.toString())}/${p0in(mTime.month.toString())}/${mTime.year}`;
+						// TODO: use Time() to align JST times to user-local timezone
+						document.getElementById("dateCreated").textContent = timeToString(cTime);
+						document.getElementById("dateModified").textContent = timeToString(mTime);
 						console.info("model files (psv)", icons);
 						console.info("icon.sys (psv)", output);
 					} catch(e) {
@@ -582,9 +639,9 @@
 						renderIcon(output2.n, output);
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
-						//TODO: use Time() to align JST times to user-local timezone
-						document.getElementById("dateCreated").textContent = `${p0in(cTime.hours.toString())}:${p0in(cTime.minutes.toString())}:${p0in(cTime.seconds.toString())} ${p0in(cTime.day.toString())}/${p0in(cTime.month.toString())}/${cTime.year}`;
-						document.getElementById("dateModified").textContent = `${p0in(mTime.hours.toString())}:${p0in(mTime.minutes.toString())}:${p0in(mTime.seconds.toString())} ${p0in(mTime.day.toString())}/${p0in(mTime.month.toString())}/${mTime.year}`;
+						// TODO: use Time() to align JST times to user-local timezone
+						document.getElementById("dateCreated").textContent = timeToString(cTime);
+						document.getElementById("dateModified").textContent = timeToString(mTime);
 						document.getElementById("fileCommentGame").textContent = vFilesystem.comments.game;
 						document.getElementById("fileCommentName").textContent = vFilesystem.comments.name;
 						if(vFilesystem.comments.hasOwnProperty("desc")) {
@@ -627,14 +684,14 @@
 						renderIcon(output2.n, output);
 						let cTime = vFilesystem.timestamps.created;
 						let mTime = vFilesystem.timestamps.modified;
-						//TODO: use Time() to align JST times to user-local timezone
+						// TODO: use Time() to align JST times to user-local timezone
 						if(cTime.year === 0) {
 							// if root directory time is null, read icon.sys instead
 							cTime = vFilesystem[vFilesystem.rootDirectory]["icon.sys"].timestamps.created;
 							mTime = vFilesystem[vFilesystem.rootDirectory]["icon.sys"].timestamps.modified;
 						}
-						document.getElementById("dateCreated").textContent = `${p0in(cTime.hours.toString())}:${p0in(cTime.minutes.toString())}:${p0in(cTime.seconds.toString())} ${p0in(cTime.day.toString())}/${p0in(cTime.month.toString())}/${cTime.year.toString()}`;
-						document.getElementById("dateModified").textContent = `${p0in(mTime.hours.toString())}:${p0in(mTime.minutes.toString())}:${p0in(mTime.seconds.toString())} ${p0in(mTime.day.toString())}/${p0in(mTime.month.toString())}/${mTime.year.toString()}`;
+						document.getElementById("dateCreated").textContent = timeToString(cTime);
+						document.getElementById("dateModified").textContent = timeToString(mTime);
 						console.info("model files (cbs)", output2);
 						console.info("icon.sys (cbs)", output);
 					} catch(e) {
@@ -759,12 +816,12 @@
 			if (typeof decodeLzari === "undefined") {
 				document.getElementById("maxinput").disabled = true;
 			}
-			//todo: More than one model shape rendering, other 2 icons (technically done? NMW though), Animation parsing, animation tweening
+			// TODO: More than one model shape rendering, other 2 icons (technically done? NMW though), Animation parsing, animation tweening (technically too)
 		</script>
 		<span id="version">icondumper2 <a href="./documentation" id="iconjsVersion">(unknown icon.js version)</a> [C: <span id="clientVersion">Loading...</span>] &mdash; &copy; <span id="currentYear">2023</span> yellows111</span>
 		<script>
 			document.getElementById("iconjsVersion").textContent = exports.version;
-			document.getElementById("clientVersion").textContent = "0.8.0+u2";
+			document.getElementById("clientVersion").textContent = "0.8.1";
 			document.getElementById("currentYear").textContent = (new Date()).getFullYear().toString();
 		</script>
 	</body>
